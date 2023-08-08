@@ -4,7 +4,7 @@ Statement: Create a server application using primarily Rust that runs on Linux w
 
 Needed:
 - Open Weather API fetching
--- Determine frequency of updates (Free API is max 1000 requests per 24 hours)
+-- Determine frequency of updates
 -- Determine what information is relevant and available
 -- Plan long term storage of certain information to build trends
 
@@ -27,3 +27,9 @@ Needed:
 -- Communication between application and other servers must be encrypted (EG API fetching)
 -- Communication between application and sensors over TCP/IP must be one-way (sensor sending data to application) if not encrypted
 -- Communication between application and sensors over RS-485 must be authenticated application-side
+
+# Research in Research folder
+- db_diesel
+-- Notes on using diesel to connect to a DB
+- weather_api
+--Notes about access openweather api
