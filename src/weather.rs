@@ -4,8 +4,9 @@
     Most calls look like "https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude={part}&appid={API key}"
 */
 
-use std::env;
+use std::{env, fmt};
 use reqwest;
+use serde_json;
 
 // Struct for response for the Geo stuff
 #[derive(Debug, Clone)]
@@ -15,6 +16,28 @@ pub struct GeoLocation {
     pub lat: f32,
     pub lon: f32,
     pub country: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct APIError {
+    #[serde(rename = "code")]
+    status_code: String,
+    message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parameters: Option<Vec<String>>,
+}
+
+impl Display for APIError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut display_message = String::new(self.message);
+        if (self.parameters.is_some()) {
+            display_message = format!("{}, Related parameters: ", display_message);
+            for item in self.parameters.iter() {
+                display_message = format!("{}, {}", display_message, item);
+            }
+        }
+        write!(f, "Status: {}, Message: {}", self.status_code, display_message)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +79,7 @@ impl Configuration {
             _ => false,
         }
     }
-    pub async fn parse_zipcode(self, zipcode: &str) -> Result<GeoLocation, Err> {
+    pub async fn parse_zipcode(self, zipcode: &str) -> Result<GeoLocation, APIError> {
         if (!self.api_set()) {
             Err("API key not set")
         }
@@ -73,14 +96,8 @@ impl Configuration {
         let return_status = geo_response.status();
         let return_contents = geo_response.text().await;
 
-        if !return_status.is_client_error() && !return_status.is_server_erorr() {
-            //If we didn't get a client or server error from the API, parse it into a GeoLocation to return it
-            serde_json::from_str(&return_contents).ok()
-        } else {
-            let err_string = format!("Status: {return_status}");
-            Err(err_string)
-        }
-
+        //parsing the returned JSON will either get us the GeoLocation or an APIError
+        serde_json::from_str(&return_contents).ok()
     }
 }
 
