@@ -4,10 +4,10 @@
     Most calls look like "https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude={part}&appid={API key}"
 */
 
-use std::{env, fmt};
+use std::{env, fmt, collections::HashMap};
 use reqwest;
 use serde_derive::{Serialize, Deserialize};
-use serde_json;
+use serde_json::Value;
 
 // Struct for response for the Geo stuff
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +17,14 @@ pub struct GeoLocation {
     pub lat: f32,
     pub lon: f32,
     pub country: String,
+}
+
+// Struct for response for air pollution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AirPollutionResponse {
+    pub coords: (f32, f32),
+    #[serde(rename = "list", flatten)]
+    pub contents: HashMap<String, Value>
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,9 +54,10 @@ impl fmt::Display for APIError {
 pub struct Configuration {
     base_path: String,
     user_agent: Option<String>,
-    pub location: Option<GeoLocation>,
+    location: Option<GeoLocation>,
     client: reqwest::Client,
     api_key: Option<String>,
+    units: String,
 }
 
 impl Configuration {
@@ -73,6 +82,10 @@ impl Configuration {
             Ok(apikey) => new_config.api_key = Some(apikey),
             _ => (),
         }
+        match env::var("WEATHER_UNITS") {
+            Ok(set_units) => new_config.set_units(&set_units),
+            _ => (),
+        }
         new_config
     }
     pub fn api_set(&self) -> bool {
@@ -80,6 +93,15 @@ impl Configuration {
             true
         } else {
             false
+        }
+    }
+    pub fn set_units(&mut self, set_units: &str) -> () {
+        let valid_units = vec!["standard".to_string(), "imperial".to_string(), "metric".to_string()];
+        let lower_case_units = set_units.to_lowercase();
+        if valid_units.contains(&lower_case_units) {
+            self.units = lower_case_units;
+        } else {
+            self.units = "imperial".to_string();
         }
     }
     pub async fn parse_zipcode(&self, zipcode: &str) -> Result<GeoLocation, APIError> {
@@ -119,6 +141,7 @@ impl Default for Configuration {
             location: None,
             client: reqwest::Client::new(),
             api_key: None,
+            units: "imperial".to_string(),
         }
     }
 }
