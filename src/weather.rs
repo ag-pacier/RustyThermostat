@@ -27,6 +27,69 @@ pub struct AirPollutionResponse {
     pub contents: HashMap<String, Value>
 }
 
+// Struct for current weather response
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeatherResponse {
+    pub coords: (f32, f32),
+    pub weather: WeatherInfo,
+    pub base: String,
+    #[serde(rename = "main")]
+    pub temperature: TemperatureInfo,
+    pub visibility: i32,
+    pub wind: WindInfo,
+    #[serde(skip_serializing_if="HashMap::is_empty", flatten)]
+    pub rain: HashMap<String, Value>,
+    #[serde(skip_serializing_if="HashMap::is_empty", flatten)]
+    pub snow: HashMap<String, Value>,
+    #[serde(skip_serializing_if="HashMap::is_empty", flatten)]
+    pub clouds: HashMap<String, Value>,
+    pub dt: i32,
+    pub sys_info: SysInfo,
+    pub timezone: i32,
+    pub id: i32,
+    pub name: String,
+    pub cod: i32,
+}
+
+//Struct for weather information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeatherInfo {
+    pub id: i32,
+    pub main: String,
+    pub description: String,
+    pub icon: String,
+}
+
+//Struct for wind information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WindInfo {
+    pub speed: f32,
+    pub deg: i32,
+    pub gust: f32,
+}
+
+//Struct for temperature information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemperatureInfo {
+    pub temp: f32,
+    pub feels_like: f32,
+    pub pressure: i32,
+    pub humidity: i32,
+    pub sea_level: i32,
+    pub grnd_level: i32,
+}
+
+//Struct for sys info from API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SysInfo {
+    #[serde(rename = "type")]
+    pub system_type: i32,
+    pub id: i32,
+    pub country: String,
+    pub sunrise: i32,
+    pub sunset: i32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct APIError {
     #[serde(rename = "code")]
