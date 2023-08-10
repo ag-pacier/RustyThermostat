@@ -19,6 +19,12 @@ pub struct GeoLocation {
     pub country: String,
 }
 
+impl GeoLocation {
+    pub fn create_uri(&self) -> String {
+        format!("lat={}&lon={}", self.lat, self.lon)
+    }
+}
+
 // Struct for response for air pollution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AirPollutionResponse {
@@ -218,11 +224,40 @@ impl Default for Configuration {
     }
 }
 
-/*
-pub async fn fetch_current_weather(local_config: &Configuration) -> WeatherResponse {
-    
+
+pub async fn fetch_current_weather(local_config: &Configuration) -> Result<WeatherResponse, APIError> {
+    //"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API key}"
+    let mut request_uri: String = "data/2.5/weather?".to_string();
+    let local_client = &local_config.client;
+    if let Some(local_location) = &local_config.location {
+        request_uri = format!("{}{}", request_uri, local_location.create_uri());
+    };
+    request_uri = format!("{}&units={}", request_uri, local_config.units);
+    let weather_request = local_config.build_request(&request_uri, reqwest::Method::GET);
+
+    let built_req = match weather_request.build() {
+        Ok(request) => request,
+        Err(error) => return Err(APIError{status_code: "400".to_string(), message: error.to_string(), parameters: None})
+    };
+    let weather_response = match local_client.execute(built_req).await {
+        Ok(resp) => resp,
+        Err(error) => return Err(APIError {status_code: error.status().unwrap().to_string(), message: error.to_string(), parameters: None})
+    };
+
+    let weather_status = weather_response.status();
+    let weather_content = match weather_response.text().await {
+        Ok(resp) => resp,
+        Err(error) => return Err(APIError {status_code: weather_status.to_string(), message: error.to_string(), parameters: None})
+    };
+    if !weather_status.is_client_error() && !weather_status.is_server_error() {
+        let current_weather: WeatherResponse = serde_json::from_str(&weather_content).ok().unwrap();
+        Ok(current_weather)
+    } else {
+        let api_error: APIError = serde_json::from_str(&weather_content).ok().unwrap();
+        Err(api_error)
+    }
 }
-*/
+
 
 #[cfg(test)]
 mod tests {
