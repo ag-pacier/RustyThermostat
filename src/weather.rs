@@ -5,7 +5,7 @@
 */
 
 use std::{env, fmt, collections::HashMap};
-use reqwest;
+use reqwest::{self, RequestBuilder};
 use serde_derive::{Serialize, Deserialize};
 use serde_json::Value;
 
@@ -173,11 +173,9 @@ impl Configuration {
             //If there is no comma in the provided zipcode, we probably forgot the ISO country code and I'm defaulting to the US
             zip = format!("{},840", zipcode);
         }
-        let local_api_key = self.api_key.clone().unwrap_or("INVALIDKEY".to_string());
 
-        let uri = format!("{0}geo/1.0/zip?zip={1}&appid={2}", self.base_path, zip, local_api_key);
-        let mut req_builder = self.client.request(reqwest::Method::GET, uri);
-        req_builder = req_builder.header(reqwest::header::USER_AGENT, &self.user_agent.clone().unwrap());
+        let uri = format!("geo/1.0/zip?zip={}", zip);
+        let req_builder = self.build_request(&uri, reqwest::Method::GET);
 
         let built_req = match req_builder.build() {
             Ok(request) => request,
@@ -186,13 +184,24 @@ impl Configuration {
 
         let geo_response = match self.client.execute(built_req).await {
             Ok(resp) => resp,
-            Err(error) => return Err(APIError { status_code: error.status().unwrap().to_string(), message: error.to_string(), parameters: None })
+            Err(error) => return Err(APIError {status_code: error.status().unwrap().to_string(), message: error.to_string(), parameters: None})
         };
 
         let return_contents = geo_response.text().await.ok().unwrap();
 
         //parsing the returned JSON will either get us the GeoLocation or an APIError
         serde_json::from_str(&return_contents).ok().unwrap()
+    }
+    pub fn build_request(&self, uri: &str, method: reqwest::Method) -> RequestBuilder {
+        let mut total_url: String = format!("{0}{1}", self.base_path, uri);
+        if let Some(local_api_key) = &self.api_key {
+            total_url = format!("{0}&appid={1}", total_url, local_api_key);
+        };
+        let mut req_builder: RequestBuilder = self.client.request(method, total_url);
+        if let Some(local_user_agent) = &self.user_agent {
+            req_builder = req_builder.header(reqwest::header::USER_AGENT, local_user_agent);
+        };
+        req_builder
     }
 }
 
@@ -209,6 +218,11 @@ impl Default for Configuration {
     }
 }
 
+/*
+pub async fn fetch_current_weather(local_config: &Configuration) -> WeatherResponse {
+    
+}
+*/
 
 #[cfg(test)]
 mod tests {
