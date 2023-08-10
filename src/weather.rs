@@ -208,3 +208,105 @@ impl Default for Configuration {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn configuration_default_basepath_not_empty() {
+        let new_config = Configuration::new();
+
+        assert!(!new_config.base_path.is_empty());
+    }
+
+    #[test]
+    fn configuration_default_useragent_is_some() {
+        let new_config = Configuration::new();
+
+        assert!(new_config.user_agent.is_some());
+    }
+
+    #[test]
+    fn configuration_default_location_is_none() {
+        let new_config = Configuration::new();
+
+        assert!(new_config.location.is_none());
+    }
+
+    #[test]
+    fn configuration_default_client_exists() {
+        let new_config = Configuration::new();
+
+        let client_debug: String = format!("{:?}", new_config.client);
+
+        assert!(!client_debug.is_empty());
+    }
+
+    #[test]
+    fn configuration_default_api_key_is_none() {
+        let new_config = Configuration::new();
+
+        assert!(new_config.api_key.is_none());
+    }
+
+    #[test]
+    fn configuration_default_units_is_imperial() {
+        let new_config = Configuration::new();
+
+        assert_eq!(new_config.units, "imperial".to_string());
+    }
+
+    #[test]
+    fn configuration_default_api_key_is_set_returns_false() {
+        let new_config = Configuration::new();
+
+        assert!(!new_config.api_set());
+    }
+
+    #[test]
+    fn configuration_not_default_api_key_is_set_returns_true() {
+        let mut new_config = Configuration::new();
+
+        new_config.api_key = Some("testkey".to_string());
+
+        assert!(new_config.api_set());
+    }
+
+    #[test]
+    fn configuration_set_units_to_metric() {
+        let mut new_config = Configuration::new();
+
+        new_config.set_units("metric");
+
+        assert_eq!(new_config.units, "metric".to_string());
+    }
+
+    #[test]
+    fn configuration_set_units_to_standard() {
+        let mut new_config = Configuration::new();
+
+        new_config.set_units("standard");
+
+        assert_eq!(new_config.units, "standard".to_string());
+    }
+
+    #[test]
+    fn configuration_set_units_to_imperial() {
+        let mut new_config = Configuration::new();
+
+        new_config.set_units("imperial");
+
+        assert_eq!(new_config.units, "imperial".to_string());
+    }
+
+    #[test]
+    fn configuration_set_units_to_imperial_with_nonsense() {
+        let mut new_config = Configuration::new();
+
+        new_config.set_units("absolutely hot garbage");
+
+        assert_eq!(new_config.units, "imperial".to_string());
+    }
+}
