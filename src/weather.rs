@@ -1,7 +1,6 @@
 /*
     Containing all the interfacing for weather's API
 
-    Most calls look like "https://api.openweathermap.org/data/3.0/onecall?lat={lat}&lon={lon}&exclude={part}&appid={API key}"
 */
 
 use std::{env, fmt, collections::HashMap};
@@ -226,7 +225,6 @@ impl Default for Configuration {
 
 
 pub async fn fetch_current_weather(local_config: &Configuration) -> Result<WeatherResponse, APIError> {
-    //"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={API key}"
     let mut request_uri: String = "data/2.5/weather?".to_string();
     let local_client = &local_config.client;
     if let Some(local_location) = &local_config.location {
