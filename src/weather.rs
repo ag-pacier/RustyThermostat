@@ -134,23 +134,23 @@ impl Configuration {
     }
     pub async fn new_env() -> Configuration {
         let mut new_config = Configuration::default();
-        match env::var("WEATHER_BASE_PATH") {
+        match env::var("RUSTY_WEATHER_BASE_PATH") {
             Ok(bpath) => new_config.base_path = bpath,
             _ => (), 
         }
-        match env::var("WEATHER_USER_AGENT") {
+        match env::var("RUSTY_WEATHER_USER_AGENT") {
             Ok(useragent) => new_config.user_agent = Some(useragent),
             _ => (),
         }
-        match env::var("WEATHER_API_KEY") {
+        match env::var("RUSTY_WEATHER_API_KEY") {
             Ok(apikey) => new_config.api_key = Some(apikey),
             _ => (),
         }
-        match env::var("WEATHER_UNITS") {
+        match env::var("RUSTY_WEATHER_UNITS") {
             Ok(set_units) => new_config.set_units(&set_units),
             _ => (),
         }
-        match env::var("WEATHER_LOCATION") {
+        match env::var("RUSTY_WEATHER_LOCATION") {
             Ok(zip) => new_config.location = new_config.parse_zipcode(&zip).await.ok(),
             _ => (),
         }
