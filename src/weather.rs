@@ -1,7 +1,5 @@
-/*
-    Containing all the interfacing for weather's API
-
-*/
+//! # Rusty Thermostat OpenWeatherMaps API Library
+//! This library holds all structs and methods to collect data from OpenWeatherMaps API
 
 use std::{env, fmt, collections::HashMap};
 use reqwest::{self, RequestBuilder};
@@ -9,7 +7,7 @@ use serde_derive::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-// Struct for response for the Geo stuff
+// Responses from the GeoLocating API can be held here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GeoLocation {
     pub zip: i32,
@@ -25,7 +23,7 @@ impl GeoLocation {
     }
 }
 
-// Struct for response for air pollution
+// Responses from the Air Pollution API can be held here
 #[derive(Debug, Clone, Deserialize)]
 pub struct AirPollutionResponse {
     list: Vec<PollList>,
@@ -109,7 +107,7 @@ impl fmt::Display for MainAqi {
     }
 }
 
-// Struct for current weather response
+// Response from the current weather API can be held here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeatherResponse {
     pub coords: (f32, f32),
@@ -133,7 +131,7 @@ pub struct WeatherResponse {
     pub cod: i32,
 }
 
-//Struct for weather information
+// Current weather stats from the WeatherResponse are stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeatherInfo {
     pub id: i32,
@@ -142,7 +140,7 @@ pub struct WeatherInfo {
     pub icon: String,
 }
 
-//Struct for wind information
+// Current wind information from the WeatherResponse is stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindInfo {
     pub speed: f32,
@@ -150,7 +148,7 @@ pub struct WindInfo {
     pub gust: f32,
 }
 
-//Struct for temperature information
+// Current temperature information from the WeatherReponse is stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemperatureInfo {
     pub temp: f32,
@@ -161,7 +159,7 @@ pub struct TemperatureInfo {
     pub grnd_level: i32,
 }
 
-//Struct for sys info from API
+// System information from the API and sunrise/sunset timing is stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SysInfo {
     #[serde(rename = "type")]
@@ -172,6 +170,7 @@ pub struct SysInfo {
     pub sunset: i32,
 }
 
+/// APIError is for containing any errors passed by the OpenWeather API
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct APIError {
     #[serde(rename = "code")]
@@ -195,6 +194,7 @@ impl fmt::Display for APIError {
     }
 }
 
+// Relevant information for building the URL and containing the reqwest client are stored here
 #[derive(Debug, Clone)]
 pub struct Configuration {
     base_path: String,
@@ -209,6 +209,9 @@ impl Configuration {
     pub fn new() -> Configuration {
         Configuration::default()
     }
+    // Build a configuration file based on environmental variables present
+    // # Errors
+    // When this parses a zip code into a GeoLocation, the API can return an error for a bad zipcode which will interrupt the process
     pub async fn new_env() -> Configuration {
         let mut new_config = Configuration::default();
         match env::var("RUSTY_WEATHER_BASE_PATH") {
@@ -274,6 +277,7 @@ impl Configuration {
         //parsing the returned JSON will either get us the GeoLocation or an APIError
         serde_json::from_str(&return_contents).ok().unwrap()
     }
+    // Accepts a URI and a reqwest method to create the RequestBuilder using the object's already established client
     pub fn build_request(&self, uri: &str, method: reqwest::Method) -> RequestBuilder {
         let mut total_url: String = format!("{0}{1}", self.base_path, uri);
         if let Some(local_api_key) = &self.api_key {
@@ -285,6 +289,9 @@ impl Configuration {
         };
         req_builder
     }
+    // Takes a complete RequestBuilder and submits it to the API
+    // # Errors
+    // This will return errors from the API if something doesn't work. Library will hijack a 400 error to display an internal error to building the request
     pub async fn execute_request(&self, final_request: RequestBuilder) -> Result<String, APIError> {
         let built_req = match final_request.build() {
             Ok(request) => request,
@@ -322,7 +329,9 @@ impl Default for Configuration {
     }
 }
 
-
+// Using information contained in the provided configuration, a request for current weather conditions will be processed
+// # Errors
+// This will return errors from the API if something doesn't work. Library will hijack a 400 error to display an internal error to building the request
 pub async fn fetch_current_weather(local_config: &Configuration) -> Result<WeatherResponse, APIError> {
     let mut request_uri: String = "data/2.5/weather?".to_string();
     if let Some(local_location) = &local_config.location {
@@ -337,7 +346,9 @@ pub async fn fetch_current_weather(local_config: &Configuration) -> Result<Weath
     }
 }
 
-
+// Using information contained in the provided configuration, a request for current air pollution stats will be processed
+// # Errors
+// This will return errors from the API if something doesn't work. Library will hijack a 400 error to display an internal error to building the request
 pub async fn fetch_current_air_poll(local_config: &Configuration) -> Result<AirPollutionResponse, APIError> {
     let mut request_uri: String = "data/2.5/air_pollution?".to_string();
     if let Some(local_location) = &local_config.location {
@@ -350,6 +361,8 @@ pub async fn fetch_current_air_poll(local_config: &Configuration) -> Result<AirP
         Err(error) => return Err(error),
     }
 }
+
+
 
 
 #[cfg(test)]
