@@ -1,11 +1,11 @@
 //! # Rusty Thermostat OpenWeatherMaps API Library
 //! This library holds all structs and methods to collect data from OpenWeatherMaps API
 
-use std::{env, fmt, collections::HashMap};
+use std::{env, fmt};
 use reqwest::{self, RequestBuilder};
 use serde_derive::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
-use serde_json::Value;
+use serde_json;
 
 // Responses from the GeoLocating API can be held here
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,7 +47,7 @@ impl AirPollutionResponse {
     }
 }
 
-/// This is the structure of the write to the database <br>
+/// This is the structure of the write of pollution to the database <br>
 /// It includes the time of the collection and all the stats collected in a flat object
 #[allow(dead_code)]
 pub struct PollUpdate {
@@ -63,6 +63,9 @@ pub struct PollUpdate {
     nh3: f32,
 }
 
+
+// TO-DO: Figure out how to write weather to the database
+// This may include re-writing PollUpdate which was pulled from pollutionclient_rs that uses InfluxDB
 
 /// OpenWeatherMaps uses this format to provide the pollution response. <br>
 /// The response is an array but typically only has one. This structure ensures we can successfully deserialize it.
@@ -110,64 +113,201 @@ impl fmt::Display for MainAqi {
 // Response from the current weather API can be held here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeatherResponse {
-    pub coords: (f32, f32),
-    pub weather: WeatherInfo,
-    pub base: String,
+    // Weather conditions
+    weather: WeatherInfo,
+    // Internally used string I'm keeping for now. Example has "stations"
+    base: String,
+    // Temperature information
     #[serde(rename = "main")]
-    pub temperature: TemperatureInfo,
-    pub visibility: i32,
-    pub wind: WindInfo,
-    #[serde(skip_serializing_if="HashMap::is_empty", flatten)]
-    pub rain: HashMap<String, Value>,
-    #[serde(skip_serializing_if="HashMap::is_empty", flatten)]
-    pub snow: HashMap<String, Value>,
-    #[serde(skip_serializing_if="HashMap::is_empty", flatten)]
-    pub clouds: HashMap<String, Value>,
-    pub dt: i32,
-    pub sys_info: SysInfo,
-    pub timezone: i32,
-    pub id: i32,
-    pub name: String,
-    pub cod: i32,
+    temperature: TemperatureInfo,
+    // Visibility based on conditions in selected units
+    visibility: i32,
+    // Wind information
+    wind: WindInfo,
+    // Rain accumulation
+    rain: Option<RainInfo>,
+    // Snow accumulation
+    snow: Option<SnowInfo>,
+    // Cloudiness percentage
+    clouds: CloudInfo,
+    // Time of calculation unix UTC
+    dt: i32,
+    // System information with sunrise and sunset
+    sys_info: SysInfo,
+}
+
+impl WeatherResponse {
+    // Get a copy of the WeatherInfo contained in a WeatherResponse
+    pub fn get_conditions_info(&self) -> WeatherInfo {
+        self.weather.clone()
+    }
+    // Get a copy of the TemperatureInfo contained in a WeatherResponse
+    pub fn get_temp_info(&self) -> TemperatureInfo {
+        self.temperature.clone()
+    }
+    // Get the current visibility in a WeatherResponse
+    pub fn get_visibility(&self) -> i32 {
+        self.visibility.clone()
+    }
+    // Get a copy of the WindInfo contained in a WeatherResponse
+    pub fn get_wind_info(&self) -> WindInfo {
+        self.wind.clone()
+    }
+    // Get a copy of the RainInfo contained in a WeatherResponse
+    // possible that it will be None
+    pub fn get_rain_info(&self) -> Option<RainInfo> {
+        self.rain.clone()
+    }
+    // Get a copy of the SnowInfo contained in a WeatherResponse
+    // possible that it will be None
+    pub fn get_snow_info(&self) -> Option<SnowInfo> {
+        self.snow.clone()
+    }
+    // Get the current cloudiness percentage
+    pub fn get_cloudiness(&self) -> i32 {
+        self.clouds.all.clone()
+    }
+    // Get the day's sunrise in unix UTC
+    pub fn get_sunrise(&self) -> i32 {
+        self.sys_info.sunrise.clone()
+    }
+    // Get the day's sunset in unix UTC
+    pub fn get_sunset(&self) -> i32 {
+        self.sys_info.sunset.clone()
+    }
 }
 
 // Current weather stats from the WeatherResponse are stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeatherInfo {
-    pub id: i32,
-    pub main: String,
-    pub description: String,
-    pub icon: String,
+    // Weather condition id
+    id: i32,
+    // Group of weather parameters (Rain, Snow, Clouds etc.)
+    main: String,
+    // Weather condition within the group
+    description: String,
+    // Weather icon id which allows you to pull their icon for the conditions
+    icon: String,
+}
+
+impl WeatherInfo {
+    // Get the URL to the icon for the current condition
+    pub fn get_icon(&self) -> String {
+        format!("https://openweathermap.org/img/wn/{}@2x.png", self.icon.clone())
+    }
+    // Get the weather group
+    pub fn get_weather_head(&self) -> String {
+        self.main.clone()
+    }
+    // Get the weather description
+    pub fn get_weather_description(&self) -> String {
+        self.description.clone()
+    }
 }
 
 // Current wind information from the WeatherResponse is stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindInfo {
-    pub speed: f32,
-    pub deg: i32,
-    pub gust: f32,
+    // Wind speed based on units selected
+    speed: f32,
+    // Wind direction, degrees (meteorological)
+    deg: i32,
+    // Wind gusts based on units selected
+    gust: f32,
+}
+
+impl WindInfo {
+    // Get a copy of the wind speed in WindInfo
+    pub fn get_wind_speed(&self) -> f32 {
+        self.speed.clone()
+    }
+    // Get a copy of wind direction in WindInfo
+    pub fn get_wind_direction(&self) -> i32 {
+        self.deg.clone()
+    }
+    // Get the gust speed in WindInfo
+    pub fn get_wind_gust(&self) -> f32 {
+        self.gust.clone()
+    }
 }
 
 // Current temperature information from the WeatherReponse is stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemperatureInfo {
-    pub temp: f32,
-    pub feels_like: f32,
-    pub pressure: i32,
-    pub humidity: i32,
-    pub sea_level: i32,
-    pub grnd_level: i32,
+    // Recorded temperature
+    temp: f32,
+    // Temperature "feels like" given conditions
+    feels_like: f32,
+    // Atmospheric pressure at sea level
+    pressure: i32,
+    // Humidity in percentage
+    humidity: i32,
+    // Atmospheric pressure at ground level
+    grnd_level: i32,
 }
 
-// System information from the API and sunrise/sunset timing is stored here
+impl TemperatureInfo {
+    // Get a copy of the temperature contained in TemperatureInfo
+    pub fn get_temp(&self) -> f32 {
+        self.temp.clone()
+    }
+    // Get a copy of the human feel temperature contained in TemperatureInfo
+    pub fn get_feels_like(&self) -> f32 {
+        self.feels_like.clone()
+    }
+    // Get a copy of the sea level atomospheric pressure contained in TemperatureInfo
+    pub fn get_sea_level_pressure(&self) -> i32 {
+        self.pressure.clone()
+    }
+    // Get a copy of the humidity percentage contained in TemperatureInfo
+    pub fn get_humidity(&self) -> i32 {
+        self.humidity.clone()
+    }
+    // Get a copy of the ground level atomospheric pressure contained in TemperatureInfo
+    pub fn get_ground_level_pressure(&self) -> i32 {
+        self.grnd_level.clone()
+    }
+}
+
+// System information: sunrise/sunset timing is stored here
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SysInfo {
     #[serde(rename = "type")]
-    pub system_type: i32,
-    pub id: i32,
-    pub country: String,
-    pub sunrise: i32,
-    pub sunset: i32,
+    // Country code from where the check came from
+    country: String,
+    // Timing of the sunrise in unix UTC
+    sunrise: i32,
+    // Timing of the sunset in unix UTC
+    sunset: i32,
+}
+
+// Rain information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RainInfo {
+    // Rain accumulation in 1 hour
+    #[serde(rename = "1h")]
+    onehour: f32,
+    // Rain accumulation in 3 hours
+    #[serde(rename = "3h")]
+    threehour: Option<f32>,
+}
+
+// Snow information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SnowInfo {
+    // Snow accumulation in 1 hour
+    #[serde(rename = "1h")]
+    onehour: f32,
+    // Snow accumulation in 3 hours
+    #[serde(rename = "3h")]
+    threehour: Option<f32>,
+}
+
+// Cloudiness
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudInfo {
+    // Percentage of cloudiness
+    all: i32,
 }
 
 /// APIError is for containing any errors passed by the OpenWeather API
@@ -361,9 +501,6 @@ pub async fn fetch_current_air_poll(local_config: &Configuration) -> Result<AirP
         Err(error) => return Err(error),
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
