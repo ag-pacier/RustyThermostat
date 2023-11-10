@@ -6,6 +6,7 @@
 use std::{env, fmt, collections::HashMap};
 use reqwest::{self, RequestBuilder};
 use serde_derive::{Serialize, Deserialize};
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 // Struct for response for the Geo stuff
@@ -25,11 +26,87 @@ impl GeoLocation {
 }
 
 // Struct for response for air pollution
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AirPollutionResponse {
-    pub coords: (f32, f32),
-    #[serde(rename = "list", flatten)]
-    pub contents: HashMap<String, Value>
+    list: Vec<PollList>,
+}
+impl fmt::Display for AirPollutionResponse {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "List: {:#?}", self.list)
+    }
+}
+
+impl AirPollutionResponse {
+    /// Consumes a AirPollutionResponse to ready it for writing to a database<br>
+    /// Note: This function assumes a response with only 1 pollution check. If multiple locations were somehow returned in a single response, all but the first will be discarded
+    pub fn unpack(self) -> PollUpdate {
+        let current_aqi: MainAqi = self.list[0].main.clone();
+        let current_pollution: Components = self.list[0].components.clone();
+        PollUpdate { time: Utc::now(),
+            aqi: current_aqi.aqi, co: current_pollution.co, no: current_pollution.no, no2: current_pollution.no2, o3: current_pollution.o3, so2: current_pollution.so2,
+            pm2_5: current_pollution.pm2_5, pm10: current_pollution.pm10, nh3: current_pollution.nh3 }
+
+    }
+}
+
+/// This is the structure of the write to the database <br>
+/// It includes the time of the collection and all the stats collected in a flat object
+#[allow(dead_code)]
+pub struct PollUpdate {
+    time: DateTime<Utc>,
+    aqi: i8,
+    co: f32,
+    no: f32,
+    no2: f32,
+    o3: f32,
+    so2: f32,
+    pm2_5: f32,
+    pm10: f32,
+    nh3: f32,
+}
+
+
+/// OpenWeatherMaps uses this format to provide the pollution response. <br>
+/// The response is an array but typically only has one. This structure ensures we can successfully deserialize it.
+#[derive(Clone, Debug, Deserialize)]
+struct PollList {
+    components: Components,
+    main: MainAqi,
+}
+impl fmt::Display for PollList {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AQI: {}, Components: {}", self.main.aqi, self.components)
+    }
+}
+
+/// This is the format used by OpenWeatherMaps to pass pollution amounts
+#[derive(Clone, Debug, Deserialize)]
+pub struct Components {
+    co: f32,
+    no: f32,
+    no2: f32,
+    o3: f32,
+    so2: f32,
+    pm2_5: f32,
+    pm10: f32,
+    nh3: f32,
+}
+impl fmt::Display for Components {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Carbon Monoxide: {} μg/m3, Nitrogen Monoxide: {} μg/m3, Nitrogen Dioxide: {} μg/m3, Ozone: {} μg/m3, Sulphur Dioxide: {} μg/m3, Fine Particulate Matter: {} μg/m3, Course Particulate Matter: {} μg/m3, Ammonia: {} μg/m3",
+        self.co, self.no, self.no2, self.o3, self.so2, self.pm2_5, self.pm10, self.nh3)
+    }
+}
+
+/// OpenWeatherMaps uses this format to pass the Air Quality Index
+#[derive(Clone, Debug, Deserialize)]
+pub struct MainAqi {
+    aqi: i8,
+}
+impl fmt::Display for MainAqi {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Air Quality: {}", self.aqi)
+    }
 }
 
 // Struct for current weather response
