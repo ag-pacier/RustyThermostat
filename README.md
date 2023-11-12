@@ -27,9 +27,3 @@ Needed:
 -- Communication between application and other servers must be encrypted (EG API fetching)
 -- Communication between application and sensors over TCP/IP must be one-way (sensor sending data to application) if not encrypted
 -- Communication between application and sensors over RS-485 must be authenticated application-side
-
-# Research in Research folder
-- db_diesel
--- Notes on using diesel to connect to a DB
-- weather_api
---Notes about access openweather api
