@@ -8,6 +8,7 @@ CREATE TABLE "PollutionReading" (
   "O3" float NOT NULL,
   "SO2" float NOT NULL,
   "PM2_5" float NOT NULL,
+  "PM10" float NOT NULL,
   "NH3" float NOT NULL
 );
 
