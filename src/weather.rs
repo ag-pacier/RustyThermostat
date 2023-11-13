@@ -3,9 +3,11 @@
 
 use std::{env, fmt};
 use reqwest::{self, RequestBuilder};
+use sea_orm::ActiveValue::{Set, NotSet};
 use serde_derive::{Serialize, Deserialize};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use serde_json;
+use crate::schema::{weather_reading, pollution_reading};
 
 // Responses from the GeoLocating API can be held here
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,35 +39,18 @@ impl fmt::Display for AirPollutionResponse {
 impl AirPollutionResponse {
     /// Consumes a AirPollutionResponse to ready it for writing to a database<br>
     /// Note: This function assumes a response with only 1 pollution check. If multiple locations were somehow returned in a single response, all but the first will be discarded
-    pub fn unpack(self) -> PollUpdate {
+    pub fn generate_db_model(self) -> pollution_reading::ActiveModel {
         let current_aqi: MainAqi = self.list[0].main.clone();
         let current_pollution: Components = self.list[0].components.clone();
-        PollUpdate { time: Utc::now(),
-            aqi: current_aqi.aqi, co: current_pollution.co, no: current_pollution.no, no2: current_pollution.no2, o3: current_pollution.o3, so2: current_pollution.so2,
-            pm2_5: current_pollution.pm2_5, pm10: current_pollution.pm10, nh3: current_pollution.nh3 }
+        pollution_reading::ActiveModel { timestamp: Set(Utc::now().naive_utc()),
+            id: NotSet, aqi: Set(current_aqi.aqi.into()), co: Set(current_pollution.co.into()),
+            no: Set(current_pollution.no.into()), no2: Set(current_pollution.no2.into()),
+            o3: Set(current_pollution.o3.into()), so2: Set(current_pollution.so2.into()),
+            pm2_5: Set(current_pollution.pm2_5.into()), pm10: Set(current_pollution.pm10.into()),
+            nh3: Set(current_pollution.nh3.into()) }
 
     }
 }
-
-/// This is the structure of the write of pollution to the database <br>
-/// It includes the time of the collection and all the stats collected in a flat object
-#[allow(dead_code)]
-pub struct PollUpdate {
-    time: DateTime<Utc>,
-    aqi: i8,
-    co: f32,
-    no: f32,
-    no2: f32,
-    o3: f32,
-    so2: f32,
-    pm2_5: f32,
-    pm10: f32,
-    nh3: f32,
-}
-
-
-// TO-DO: Figure out how to write weather to the database
-// This may include re-writing PollUpdate which was pulled from pollutionclient_rs that uses InfluxDB
 
 /// OpenWeatherMaps uses this format to provide the pollution response. <br>
 /// The response is an array but typically only has one. This structure ensures we can successfully deserialize it.
@@ -174,6 +159,53 @@ impl WeatherResponse {
     // Get the day's sunset in unix UTC
     pub fn get_sunset(&self) -> i32 {
         self.sys_info.sunset.clone()
+    }
+    // Consumes a WeatherResponse into an ActiveModel to be put into the DB
+    pub fn generate_db_model(self) -> weather_reading::ActiveModel {
+        let mut reading: weather_reading::ActiveModel = weather_reading::ActiveModel {
+            id: NotSet,
+            timestamp: Set(Utc::now().naive_utc()),
+            condition: Set(self.weather.main),
+            description: Set(self.weather.description),
+            icon: Set(self.weather.icon),
+            temp_real: Set(self.temperature.temp.into()),
+            temp_feel: Set(self.temperature.feels_like.into()),
+            pressure_sea: Set(self.temperature.pressure),
+            humidity: Set(self.temperature.humidity),
+            pressure_ground: Set(self.temperature.grnd_level),
+            visibility: Set(self.visibility),
+            wind_speed: Set(self.wind.speed.into()),
+            wind_deg: Set(self.wind.deg),
+            wind_gust: Set(self.wind.gust.into()),
+            rain1_h: NotSet,
+            rain3_h: NotSet,
+            snow1_h: NotSet,
+            snow3_h: NotSet,
+            clouds: Set(self.clouds.all),
+            dt: Set(self.dt),
+            sunrise: Set(self.sys_info.sunrise),
+            sunset: Set(self.sys_info.sunset),
+        };
+        let rain: Option<RainInfo> = self.rain;
+        let snow: Option<SnowInfo> = self.snow;
+
+        if rain.is_some() {
+            let unpacked: RainInfo = rain.unwrap();
+            reading.rain1_h = Set(Some(unpacked.onehour.into()));
+            if unpacked.threehour.is_some() {
+                let threehour: f64 = unpacked.threehour.unwrap().into();
+                reading.rain3_h = Set(Some(threehour));
+            }
+        }
+        if snow.is_some() {
+            let unpacked: SnowInfo = snow.unwrap();
+            reading.snow1_h = Set(Some(unpacked.onehour.into()));
+            if unpacked.threehour.is_some() {
+                let threehour: f64 = unpacked.threehour.unwrap().into();
+                reading.snow3_h = Set(Some(threehour));
+            }
+        }
+        reading
     }
 }
 
