@@ -22,6 +22,8 @@ pub struct Model {
     pub so2: f64,
     #[sea_orm(column_name = "PM2_5", column_type = "Double")]
     pub pm2_5: f64,
+    #[sea_orm(column_name = "PM10", column_type = "Double")]
+    pub pm10: f64,
     #[sea_orm(column_name = "NH3", column_type = "Double")]
     pub nh3: f64,
 }
