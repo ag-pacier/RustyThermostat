@@ -5,7 +5,9 @@
 // tokio-serial: https://docs.rs/tokio-serial/latest/tokio_serial/
 
 use tokio_serial;
+use tokio_serial::SerialPort;
 use std::path::Path;
+use std::io::{BufReader, BufRead};
 use super::*;
 
 // Note to future self
@@ -25,6 +27,7 @@ struct SerialMsg {
 
 impl SerialMsg {
     pub fn parse_str_to_msg(msg: String) -> Result<SerialMsg, tokio_serial::Error> {
+        let msg: &str = msg.trim();
         let components: Vec<&str> = msg.split('#').collect();
         let vec_length: usize = components.len();
         if vec_length < 6 || vec_length >= 7 {
@@ -94,7 +97,7 @@ fn parse_str_to_float(item: &str) -> Result<Option<f32>, tokio_serial::Error> {
 }
 
 fn parse_item_for_absent(item: &str) -> Result<bool, tokio_serial::Error> {
-    let test_char: Result<char, std::char::ParseCharError> = item.clone().parse::<char>();
+    let test_char: Result<char, std::char::ParseCharError> = item.parse::<char>();
     match test_char {
         Ok('A') => return Ok(true),
         Ok('a') => return Ok(true),
@@ -103,8 +106,10 @@ fn parse_item_for_absent(item: &str) -> Result<bool, tokio_serial::Error> {
 }
 
 /// check for the desired default which is /dev/ttyAMA0
+/// This currently doesn't seem to return anything even though you can manually pick a serial port and use it just fine
 /// # Error
 /// If trying to look at the serial ports errors, this will return that error instead of a bool
+#[allow(dead_code)]
 pub fn check_for_pi_uart() -> Result<bool, tokio_serial::Error> {
     let available_ports: Vec<tokio_serial::SerialPortInfo> = tokio_serial::available_ports()?;
     for sport in available_ports.into_iter() {
@@ -135,4 +140,47 @@ pub fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilde
         let msg: String = format!("Unable to find device: {}", test_path);
         Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::NoDevice, description: msg })
     }
+}
+
+
+// Note, turn this into an async loop to constantly eat serial info and prep it for the database
+// This was copied from my test with just changing the function naming so it will need tweaking
+fn grab_serial_data() -> Result<(), tokio_serial::Error> {
+    let my_serial: tokio_serial::SerialPortBuilder = build_serial(None)?;
+
+    let my_open_serial: Box<dyn SerialPort> = my_serial.open().expect("Unable to open port!");
+
+    match my_open_serial.clear(tokio_serial::ClearBuffer::All) {
+        Ok(_) => println!("Buffer cleared."),
+        Err(e) => println!("Encountered an error clearing the buffers: {:#?}", e),
+    }
+
+    let mut msg: String = String::new();
+
+    let mut reader: BufReader<Box<dyn SerialPort>> = BufReader::new(my_open_serial);
+
+    let mut enumer: u8 = 0;
+
+    while enumer < 90 {
+        let result: Result<usize, std::io::Error> = reader.read_line(&mut msg);
+
+        if result.is_ok() {
+            let new_reading: SerialMsg = SerialMsg::parse_str_to_msg(msg)?;
+
+            println!("Received and parsed SerialMsg as: {:#?}", new_reading);
+
+            reader.consume(result.unwrap());
+            msg = "".to_string();
+
+            println!("Cleared buffers and waiting for next message.");
+        } else {
+
+            println!("Nothing in buffers. Waiting for another message...");
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+        }
+        enumer = enumer + 1;
+    }
+
+    Ok(())
 }
