@@ -1,8 +1,11 @@
 //! # Rusty Thermostat Sensor library
 //! These modules provide structure and methods to interact with the sensors available to the system
+
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 use std::fmt;
+use sea_orm::ActiveValue::{Set, NotSet};
+use crate::schema::{sensors, sensor_reading_history};
 
 pub mod pi_ser;
 
@@ -31,9 +34,32 @@ impl Sensor {
         Sensor::default()
     }
 
-    /// Returns the token if there is one
-    pub fn get_token(&self) -> Option<String> {
-        self.token.clone()
+    /// Returns the token. Will be None if nothing is set
+    pub fn get_token(&self) -> String {
+        match self.token.clone() {
+            Some(toke) => toke,
+            None => "N/A".to_string(),
+        }
+    }
+
+    /// Consumes a sensor to create an ActiveModel to put in the db
+    pub fn generate_db_model_new_sensor(self) -> sensors::ActiveModel {
+        let token: String = self.get_token();
+        sensors::ActiveModel {
+            id: Set(self.id),
+            active: Set(self.active),
+            name: Set(self.name),
+            token: Set(token),
+            associated_zone: Set(self.associated_zone),
+            time_added: Set(Utc::now().naive_utc()),
+            time_updated: NotSet,
+            com_type: Set(self.com_type),
+            com_last: NotSet,
+            current_temp: NotSet,
+            current_humid: NotSet,
+            presence: NotSet,
+            threshold_open: NotSet,
+        }
     }
 }
 
@@ -105,6 +131,36 @@ impl SensorReading {
     /// Add the threshold status to the sensor reading
     pub fn append_threshold(mut self, thresh: bool) -> () {
         self.threshold_open = Some(thresh);
+    }
+
+    /// Convert Celsius from f32 to f64
+    pub fn convert_cel(&self) -> Option<f64> {
+        match self.temp_c_reading {
+            Some(temp_c) => Some(temp_c.into()),
+            None => None
+        }
+    }
+
+    /// Convert Fahrenheit from f32 to f64
+    pub fn convert_fah(&self) -> Option<f64> {
+        match self.temp_f_reading {
+            Some(temp_f) => Some(temp_f.into()),
+            None => None
+        }
+    }
+
+    /// Consume a sensor reading to put in the sensor reading history table
+    pub fn generate_db_model(self) -> sensor_reading_history::ActiveModel {
+        sensor_reading_history::ActiveModel {
+            id: NotSet,
+            sensor_id: Set(self.device_id),
+            timestamp: Set(Utc::now().naive_utc()),
+            reading_temp_c: Set(self.convert_cel()),
+            reading_temp_f: Set(self.convert_fah()),
+            reading_humidity: Set(self.humid_reading),
+            reading_presence: Set(self.presence),
+            reading_threshold_open: Set(self.threshold_open)
+        }
     }
 }
 
