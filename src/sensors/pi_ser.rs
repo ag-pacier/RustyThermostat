@@ -4,7 +4,7 @@
 // mio-serial: https://docs.rs/mio-serial/latest/mio_serial/index.html
 // tokio-serial: https://docs.rs/tokio-serial/latest/tokio_serial/
 
-use tokio_serial;
+use tokio_serial::{self, SerialPortBuilderExt};
 use tokio_serial::SerialPort;
 use std::path::Path;
 use std::io::{BufReader, BufRead};
@@ -16,7 +16,7 @@ use super::*;
 
 // Structure to contain serial messages and their information
 #[derive(Clone, Debug)]
-struct SerialMsg {
+pub struct SerialMsg {
     source: Uuid,
     humidity: Option<i32>,
     temp_cel: Option<f32>,
@@ -145,7 +145,8 @@ pub fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilde
 
 // Note, turn this into an async loop to constantly eat serial info and prep it for the database
 // This was copied from my test with just changing the function naming so it will need tweaking
-fn grab_serial_data() -> Result<(), tokio_serial::Error> {
+#[allow(dead_code)]
+fn grab_serial_data_blocking() -> Result<(), tokio_serial::Error> {
     let my_serial: tokio_serial::SerialPortBuilder = build_serial(None)?;
 
     let my_open_serial: Box<dyn SerialPort> = my_serial.open().expect("Unable to open port!");
@@ -183,4 +184,30 @@ fn grab_serial_data() -> Result<(), tokio_serial::Error> {
     }
 
     Ok(())
+}
+
+// async method of grabbing data from the set serial port
+pub async fn get_serial_msg() -> Result<SerialMsg, tokio_serial::Error> {
+    let my_serial: tokio_serial::SerialPortBuilder = build_serial(None)?;
+    let mut my_open_serial: tokio_serial::SerialStream = my_serial.open_native_async()?;
+
+    let mut byte_buffer: [u8; 57] = [0; 57];
+    my_open_serial.readable().await?;
+    let msg_size: usize = my_open_serial.try_read(&mut byte_buffer)?;
+
+    // If the msg_size wasn't what we're expecting, discard the buffers and try one more time
+    if msg_size < 57 {
+        my_open_serial.clear(tokio_serial::ClearBuffer::All)?;
+        byte_buffer = [0; 57];
+        my_open_serial.readable().await?;
+        let msg_size: usize = my_open_serial.try_read(&mut byte_buffer)?;
+
+        if msg_size < 57 {
+            let msg: String = format!("Received short or invalid message: {:#?}", byte_buffer);
+            return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::Unknown, description: msg })
+        }
+    }
+
+    let new_reading: SerialMsg = SerialMsg::parse_str_to_msg(String::from_utf8_lossy(&byte_buffer).into_owned())?;
+    Ok(new_reading)
 }
