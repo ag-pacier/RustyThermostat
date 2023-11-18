@@ -5,14 +5,45 @@
 // tokio-serial: https://docs.rs/tokio-serial/latest/tokio_serial/
 
 use tokio_serial::{self, SerialPortBuilderExt};
-use tokio_serial::SerialPort;
+use tokio_util::codec::{Decoder, Encoder};
+use futures::stream::StreamExt;
+use bytes::BytesMut;
 use std::path::Path;
-use std::io::{BufReader, BufRead};
+use std::io;
 use super::*;
 
 // Note to future self
 // Keep the parsing of the sensor data here and only push them into the objects from the library when they are ready
 // Each communication type is going to have its own way of parsing the input into the correct object
+
+/// adapted from tokio_serial example
+struct LineCodec;
+
+impl Decoder for LineCodec {
+    type Item = String;
+    type Error = io::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let newline = src.as_ref().iter().position(|b| *b == b'\n');
+        if let Some(n) = newline {
+            let line = src.split_to(n + 1);
+            return match String::from_utf8(line.as_ref().to_vec()) {
+                Ok(s) => Ok(Some(s.to_string())),
+                Err(_) => Err(io::Error::new(io::ErrorKind::Other, "Invalid String")),
+            };
+        }
+        Ok(None)
+    }
+}
+
+impl Encoder<String> for LineCodec {
+    type Error = io::Error;
+
+    fn encode(&mut self, _item: String, _dst: &mut BytesMut) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
 
 // Structure to contain serial messages and their information
 #[derive(Clone, Debug)]
@@ -105,21 +136,6 @@ fn parse_item_for_absent(item: &str) -> Result<bool, tokio_serial::Error> {
     }
 }
 
-/// check for the desired default which is /dev/ttyAMA0
-/// This currently doesn't seem to return anything even though you can manually pick a serial port and use it just fine
-/// # Error
-/// If trying to look at the serial ports errors, this will return that error instead of a bool
-#[allow(dead_code)]
-pub fn check_for_pi_uart() -> Result<bool, tokio_serial::Error> {
-    let available_ports: Vec<tokio_serial::SerialPortInfo> = tokio_serial::available_ports()?;
-    for sport in available_ports.into_iter() {
-        if sport.port_name == "/dev/ttyAMA0".to_string() {
-            return Ok(true)
-        }
-    }
-    return Ok(false)
-}
-
 /// Create a serial port with the desired defaults
 /// Optionally will accept a path to another serial device
 /// Make this mutable if you'd like to modify settings
@@ -142,72 +158,21 @@ pub fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilde
     }
 }
 
-
-// Note, turn this into an async loop to constantly eat serial info and prep it for the database
-// This was copied from my test with just changing the function naming so it will need tweaking
-#[allow(dead_code)]
-fn grab_serial_data_blocking() -> Result<(), tokio_serial::Error> {
-    let my_serial: tokio_serial::SerialPortBuilder = build_serial(None)?;
-
-    let my_open_serial: Box<dyn SerialPort> = my_serial.open().expect("Unable to open port!");
-
-    match my_open_serial.clear(tokio_serial::ClearBuffer::All) {
-        Ok(_) => println!("Buffer cleared."),
-        Err(e) => println!("Encountered an error clearing the buffers: {:#?}", e),
-    }
-
-    let mut msg: String = String::new();
-
-    let mut reader: BufReader<Box<dyn SerialPort>> = BufReader::new(my_open_serial);
-
-    let mut enumer: u8 = 0;
-
-    while enumer < 90 {
-        let result: Result<usize, std::io::Error> = reader.read_line(&mut msg);
-
-        if result.is_ok() {
-            let new_reading: SerialMsg = SerialMsg::parse_str_to_msg(msg)?;
-
-            println!("Received and parsed SerialMsg as: {:#?}", new_reading);
-
-            reader.consume(result.unwrap());
-            msg = "".to_string();
-
-            println!("Cleared buffers and waiting for next message.");
-        } else {
-
-            println!("Nothing in buffers. Waiting for another message...");
-            std::thread::sleep(std::time::Duration::from_secs(2));
-
-        }
-        enumer = enumer + 1;
-    }
-
-    Ok(())
-}
-
-// async method of grabbing data from the set serial port
-pub async fn get_serial_msg() -> Result<SerialMsg, tokio_serial::Error> {
+pub async fn get_serial_msg() -> Result<(), tokio_serial::Error> {
     let my_serial: tokio_serial::SerialPortBuilder = build_serial(None)?;
     let mut my_open_serial: tokio_serial::SerialStream = my_serial.open_native_async()?;
 
-    let mut byte_buffer: [u8; 57] = [0; 57];
-    my_open_serial.readable().await?;
-    let msg_size: usize = my_open_serial.try_read(&mut byte_buffer)?;
-
-    // If the msg_size wasn't what we're expecting, discard the buffers and try one more time
-    if msg_size < 57 {
-        my_open_serial.clear(tokio_serial::ClearBuffer::All)?;
-        byte_buffer = [0; 57];
-        my_open_serial.readable().await?;
-        let msg_size: usize = my_open_serial.try_read(&mut byte_buffer)?;
-
-        if msg_size < 57 {
-            let msg: String = format!("Received short or invalid message: {:#?}", byte_buffer);
-            return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::Unknown, description: msg })
-        }
+    #[cfg(unix)]
+    match my_open_serial.set_exclusive(false) {
+        Ok(_) => (),
+        Err(e) => println!("Tried and failed to set the port as false!"),
     }
 
-    let new_reading: SerialMsg = SerialMsg::parse_str_to_msg(String::from_utf8_lossy(&byte_buffer).into_owned())?;
-    Ok(new_reading)
+    let mut reader: tokio_util::codec::Framed<tokio_serial::SerialStream, LineCodec> = LineCodec.framed(my_open_serial);
+    while let Some(line_result) = reader.next().await {
+        let line: String = line_result.expect("Failed to read line");
+        let new_serial_msg: SerialMsg = SerialMsg::parse_str_to_msg(line).expect("Unable to parse into SerialMsg!");
+        println!("{:#?}", new_serial_msg);
+    }
+    Ok(())
 }
