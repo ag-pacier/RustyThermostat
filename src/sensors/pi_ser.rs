@@ -158,21 +158,57 @@ pub fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilde
     }
 }
 
-pub async fn get_serial_msg() -> Result<(), tokio_serial::Error> {
-    let my_serial: tokio_serial::SerialPortBuilder = build_serial(None)?;
-    let mut my_open_serial: tokio_serial::SerialStream = my_serial.open_native_async()?;
+/*
+MAX 485 wiring reminder:
+Pin Name	Description
+VCC	        This is the power supply pin. It is connected with 5V that powers up the module.
+A	        This is the non-inverting receiver input and driver output. It is connected with A on the other module.
+B	        This is the inverting receiver input and driver output. It is connected with B on the other module.
+GND	        This is the GND pin. It is connected with common ground.
+RO	        This is the receiver output pin. It is connected with the RX pin of the microcontroller.
+RE	        This is the receiver output enable pin. To enable, it is set at a LOW state.
+DE	        This is the driver output enable pin. To enable, it is set at a HIGH state.
+DI	        This is the driver input. It is connected with the TX pin of the microcontroller.
+
+Thus wiring is:
+Module     Device
+VCC <----> 5V
+GND <----> GND
+RE+DE <--> Digital Output (LOW to receive, HIGH to send)
+RO <-----> UART RX
+DI <-----> UART TX
+
+---
+Protocol Ideas
+- Received messages from sensors should start with a valid UUID
+- Valid commands to established sensors should start with hash of UUID
+- New sensors requesting association send all zero'd UUID in the correct tranmission showing capability
+- New sensor format: UUID#HumidityBool#TempCBool#TempFBool#PresenceBool#ThresholdBool\n
+- Command format: UUIDhash#Command#Arg1#Arg2#Arg3#Arg4\n
+- The number of # must be fixed but areas in between #s do not need anything if not needed for the command
+- Command ideas: Provision, Set, Delete/Ban
+- Provision Command: UUIDhash#PRO#UUID###\n
+- Set Command: UUIDhash#SET#delay#timeINmilliseconds##\n
+- Ban Command: UUIDhash#BAN#UUID###\n
+*/
+
+/// Grab a serial message if available
+pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Result<Option<SerialMsg>, tokio_serial::Error> {
+    let mut my_open_serial: tokio_serial::SerialStream = ser_built.open_native_async()?;
 
     #[cfg(unix)]
     match my_open_serial.set_exclusive(false) {
         Ok(_) => (),
-        Err(e) => println!("Tried and failed to set the port as false!"),
+        Err(_) => println!("Tried and failed to set the port as not exclusive!"),
     }
 
     let mut reader: tokio_util::codec::Framed<tokio_serial::SerialStream, LineCodec> = LineCodec.framed(my_open_serial);
-    while let Some(line_result) = reader.next().await {
-        let line: String = line_result.expect("Failed to read line");
-        let new_serial_msg: SerialMsg = SerialMsg::parse_str_to_msg(line).expect("Unable to parse into SerialMsg!");
-        println!("{:#?}", new_serial_msg);
-    }
-    Ok(())
+
+    let line_result: String = match reader.next().await {
+        None => return Ok(None),
+        Some(line) => line?,
+    };
+
+    return Ok(Some(SerialMsg::parse_str_to_msg(line_result)?))
 }
+
