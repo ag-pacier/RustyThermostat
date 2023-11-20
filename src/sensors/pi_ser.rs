@@ -184,15 +184,16 @@ Protocol Ideas
 - Valid commands to established sensors should start with hash of UUID
 - New sensors requesting association send all zero'd UUID in the correct tranmission showing capability
 - New sensor format: UUID#HumidityBool#TempCBool#TempFBool#PresenceBool#ThresholdBool\n
-- Command format: UUIDhash#Command#Arg1#Arg2#Arg3#Arg4\n
+- Command format: $UUID#Command#Arg1#Arg2#Arg3#Arg4\n
 - The number of # must be fixed but areas in between #s do not need anything if not needed for the command
 - Command ideas: Provision, Set, Delete/Ban
-- Provision Command: UUIDhash#PRO#UUID###\n
-- Set Command: UUIDhash#SET#delay#timeINmilliseconds##\n
-- Ban Command: UUIDhash#BAN#UUID###\n
+- Provision Command: $PRO#UUID#SALT###\n
+- Set frequency Command: $UUID#SET#delay#timeINmilliseconds##\n
+- Set activity Command: $UUID#SET#active#bool##\n
 */
 
 /// Grab a serial message if available
+#[allow(unused_mut)]
 pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Result<Option<SerialMsg>, tokio_serial::Error> {
     let mut my_open_serial: tokio_serial::SerialStream = ser_built.open_native_async()?;
 
