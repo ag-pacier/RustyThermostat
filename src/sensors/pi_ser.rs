@@ -169,16 +169,16 @@ DI <-----> UART TX
 
 ---
 Protocol Ideas
+
 - New sensors requesting association send all zero'd UUID in the correct tranmission showing capability
 - New sensor format: UUID#HumidityBool#TempCBool#TempFBool#PresenceBool#ThresholdBool\n
-- Command format: $UUID#Command#Arg1#Arg2#Arg3#Arg4\n
-- The number of # must be fixed but areas in between #s do not need anything if not needed for the command
-- Command ideas: Provision, Set, Delete/Ban
-- Provision Command: $PRO#UUID#SALT###\n
-- Set frequency Command: $UUID#SET#delay#timeINmilliseconds##\n
-- Set activity Command: $UUID#SET#active#bool##\n
-
-
+- New sensor response if accepted: $UUID\n
+- Command format: IV|PAYLOADwithCOMMAND|MAC\n
+(NOTE: IV will always be 16 bits first, MAC will always be 32 bits last. No separators in communication or you will foul up the encryption )
+- The number of # must be fixed inside the payload but areas in between #s do not need anything if not needed for the command
+- Command ideas: Set frequency, Set activity
+- Set frequency Command: SET#delay#timeINmilliseconds##\n
+- Set activity Command: SET#active#bool##\n
 */
 
 /// Grab a serial message if available
@@ -201,3 +201,4 @@ pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Resul
 
     return Ok(Some(SerialMsg::parse_str_to_msg(line_result)?))
 }
+
