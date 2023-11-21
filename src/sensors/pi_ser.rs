@@ -159,18 +159,7 @@ pub fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilde
 }
 
 /*
-MAX 485 wiring reminder:
-Pin Name	Description
-VCC	        This is the power supply pin. It is connected with 5V that powers up the module.
-A	        This is the non-inverting receiver input and driver output. It is connected with A on the other module.
-B	        This is the inverting receiver input and driver output. It is connected with B on the other module.
-GND	        This is the GND pin. It is connected with common ground.
-RO	        This is the receiver output pin. It is connected with the RX pin of the microcontroller.
-RE	        This is the receiver output enable pin. To enable, it is set at a LOW state.
-DE	        This is the driver output enable pin. To enable, it is set at a HIGH state.
-DI	        This is the driver input. It is connected with the TX pin of the microcontroller.
-
-Thus wiring is:
+Wiring:
 Module     Device
 VCC <----> 5V
 GND <----> GND
@@ -180,8 +169,6 @@ DI <-----> UART TX
 
 ---
 Protocol Ideas
-- Received messages from sensors should start with a valid UUID
-- Valid commands to established sensors should start with hash of UUID
 - New sensors requesting association send all zero'd UUID in the correct tranmission showing capability
 - New sensor format: UUID#HumidityBool#TempCBool#TempFBool#PresenceBool#ThresholdBool\n
 - Command format: $UUID#Command#Arg1#Arg2#Arg3#Arg4\n
@@ -190,6 +177,8 @@ Protocol Ideas
 - Provision Command: $PRO#UUID#SALT###\n
 - Set frequency Command: $UUID#SET#delay#timeINmilliseconds##\n
 - Set activity Command: $UUID#SET#active#bool##\n
+
+
 */
 
 /// Grab a serial message if available
@@ -212,4 +201,3 @@ pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Resul
 
     return Ok(Some(SerialMsg::parse_str_to_msg(line_result)?))
 }
-
