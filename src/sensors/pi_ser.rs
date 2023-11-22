@@ -13,6 +13,7 @@ use std::io;
 use sha2;
 use hmac::{Hmac, Mac, digest::InvalidLength};
 use libaes::Cipher;
+use rand::Rng;
 use super::*;
 
 // Note to future self
@@ -45,6 +46,18 @@ impl Encoder<String> for LineCodec {
     fn encode(&mut self, _item: String, _dst: &mut BytesMut) -> Result<(), Self::Error> {
         Ok(())
     }
+}
+
+/// Stucture for containing a serial message going out
+#[derive(Clone, Debug)]
+pub struct SerialCmd {
+    destination: Uuid,
+    iv: [u8; 16],
+    command: String,
+}
+
+impl SerialCmd {
+    
 }
 
 /// Structure to contain serial messages and their information
