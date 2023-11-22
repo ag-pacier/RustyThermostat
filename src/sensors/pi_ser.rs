@@ -10,6 +10,9 @@ use futures::stream::StreamExt;
 use bytes::BytesMut;
 use std::path::Path;
 use std::io;
+use sha2;
+use hmac::{Hmac, Mac, digest::InvalidLength};
+use libaes::Cipher;
 use super::*;
 
 // Note to future self
@@ -44,8 +47,7 @@ impl Encoder<String> for LineCodec {
     }
 }
 
-
-// Structure to contain serial messages and their information
+/// Structure to contain serial messages and their information
 #[derive(Clone, Debug)]
 pub struct SerialMsg {
     source: Uuid,
@@ -200,5 +202,74 @@ pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Resul
     };
 
     return Ok(Some(SerialMsg::parse_str_to_msg(line_result)?))
+}
+
+/// Take a UUID, an IV and the message to encrypt and create a Vector of bytes that represents that encrypted message
+pub fn encrypt_message(dest: Uuid, iv: [u8; 16], mess: &String) -> Vec<u8> {
+    let mut new_key: [u8; 32] = [0; 32];
+    let mut i: usize = 0;
+
+    for bit in dest.as_simple().to_string().as_bytes() {
+        new_key[i] = *bit;
+        i=i+1;
+    }
+
+    let my_cipher: Cipher = Cipher::new_256(&new_key);
+    my_cipher.cbc_encrypt(&iv, mess.as_bytes())
+}
+
+/// Take a UUID, an IV and an encrypted message and attempt to decrypt it and convert into a String
+/// # Errors
+/// If the decrypted bytes can't be made into a string, this will error
+/// At this time, this will NOT error if the wrong message was decrypted or decrypted incorrectly!
+pub fn decrypt_message(source: Uuid, iv: [u8; 16], payload: &Vec<u8>) -> Result<String, std::string::FromUtf8Error> {
+    let mut new_key: [u8; 32] = [0; 32];
+    let mut i: usize = 0;
+
+    for bit in source.as_simple().to_string().as_bytes() {
+        new_key[i] = *bit;
+        i=i+1;
+    }
+
+    let my_cipher: Cipher = Cipher::new_256(&new_key);
+    let decrypted: Vec<u8> = my_cipher.cbc_decrypt(&iv, &payload[..]);
+    String::from_utf8(decrypted)
+}
+
+/// Generate an HMAC based on the UUID and a given encrypted payload
+pub fn generate_hmac(the_uuid: Uuid, payload: &Vec<u8>) -> Result<[u8; 32], InvalidLength> {
+    type HmacSha256 = Hmac<sha2::Sha256>;
+
+    let mut final_mac: [u8; 32] = [0; 32];
+    let mut i: usize = 0;
+
+    let mut mac = match HmacSha256::new_from_slice(the_uuid.as_simple().to_string().as_bytes()) {
+        Ok(hmacer) => hmacer,
+        Err(e) => return Err(e),
+    };
+    mac.update(&payload.as_slice());
+    let result = mac.finalize();
+    for bit in result.into_bytes() {
+        final_mac[i] = bit;
+        i=i+1;
+    }
+    Ok(final_mac)
+}
+
+/// Verify a given UUID and encrypted payload against the extracted HMAC
+/// Returns true if there is a match and false if there are any issues
+pub fn verify_hmac(the_uuid: Uuid, payload: &Vec<u8>, received_hmac: [u8; 32]) -> bool {
+    type HmacSha256 = Hmac<sha2::Sha256>;
+
+    let mut mac = match HmacSha256::new_from_slice(the_uuid.as_simple().to_string().as_bytes()) {
+        Ok(hmacer) => hmacer,
+        Err(_) => return false,
+    };
+    mac.update(&payload.as_slice());
+
+    match mac.verify_slice(&received_hmac[..]) {
+        Ok(()) => return true,
+        Err(_) => return false,
+    }
 }
 
