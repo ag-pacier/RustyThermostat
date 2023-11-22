@@ -57,12 +57,36 @@ pub struct SerialCmd {
 }
 
 impl SerialCmd {
-    
+    pub fn new(dest: Uuid, iv: Option<[u8; 16]>, com: String) -> SerialCmd {
+        let final_iv: [u8; 16] = match iv {
+            Some(given_iv) => given_iv,
+            None => rand::thread_rng().gen::<[u8; 16]>(),
+        };
+        SerialCmd { destination: dest, iv: final_iv, command: com }
+    }
+    pub fn build_msg(&self) -> Result<Vec<u8>, InvalidLength> {
+        let local_cmd: SerialCmd = self.clone();
+        let begin_iv: [u8; 16] = self.iv.clone();
+        let payload: Vec<u8> = encrypt_message(local_cmd.destination.clone(), local_cmd.iv, &local_cmd.command);
+
+        let gen_hmac: [u8; 32] = generate_hmac(local_cmd.destination, &payload)?;
+        let mut final_payload: Vec<u8> = vec![];
+        for bit in begin_iv  {
+            final_payload.push(bit)
+        }
+        for bit in payload.into_iter() {
+            final_payload.push(bit)
+        }
+        for bit in gen_hmac {
+            final_payload.push(bit)
+        }
+        Ok(final_payload)
+    }
 }
 
 /// Structure to contain serial messages and their information
 #[derive(Clone, Debug)]
-pub struct SerialMsg {
+pub struct SerialReading {
     source: Uuid,
     humidity: Option<i32>,
     temp_cel: Option<f32>,
@@ -71,8 +95,8 @@ pub struct SerialMsg {
     threshol: Option<bool>
 }
 
-impl SerialMsg {
-    pub fn parse_str_to_msg(msg: String) -> Result<SerialMsg, tokio_serial::Error> {
+impl SerialReading {
+    pub fn parse_str_to_msg(msg: String) -> Result<SerialReading, tokio_serial::Error> {
         let msg: &str = msg.trim();
         let components: Vec<&str> = msg.split('#').collect();
         let vec_length: usize = components.len();
@@ -85,7 +109,7 @@ impl SerialMsg {
             Err(errored) => return Err(tokio_serial::Error{ kind: tokio_serial::ErrorKind::InvalidInput, description: errored.to_string() })
         };
 
-        Ok(SerialMsg { source: source_uuid, humidity: parse_str_to_int(components[1])?,
+        Ok(SerialReading { source: source_uuid, humidity: parse_str_to_int(components[1])?,
                         temp_cel: parse_str_to_float(components[2])?,
                         temp_fah: parse_str_to_float(components[3])?,
                         presence: parse_str_to_bool(components[4])?,
@@ -198,7 +222,7 @@ Protocol Ideas
 
 /// Grab a serial message if available
 #[allow(unused_mut)]
-pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Result<Option<SerialMsg>, tokio_serial::Error> {
+pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Result<Option<SerialReading>, tokio_serial::Error> {
     let mut my_open_serial: tokio_serial::SerialStream = ser_built.open_native_async()?;
 
     #[cfg(unix)]
@@ -214,7 +238,7 @@ pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Resul
         Some(line) => line?,
     };
 
-    return Ok(Some(SerialMsg::parse_str_to_msg(line_result)?))
+    return Ok(Some(SerialReading::parse_str_to_msg(line_result)?))
 }
 
 /// Take a UUID, an IV and the message to encrypt and create a Vector of bytes that represents that encrypted message
