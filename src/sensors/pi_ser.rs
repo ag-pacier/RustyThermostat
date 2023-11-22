@@ -9,7 +9,7 @@ use tokio_util::codec::{Decoder, Encoder};
 use futures::stream::StreamExt;
 use bytes::BytesMut;
 use std::path::Path;
-use std::io;
+use std::{io, fmt::Display};
 use sha2;
 use hmac::{Hmac, Mac, digest::InvalidLength};
 use libaes::Cipher;
@@ -84,7 +84,128 @@ impl SerialCmd {
     }
 }
 
-/// Structure to contain serial messages and their information
+/// Structure for containing raw serial messages and parsing them
+pub struct SerialMsg {
+    orig_msg: String,
+    parsed_iv: Option<[u8; 16]>,
+    parsed_payload: Option<Vec<u8>>,
+    parsed_hmac: Option<[u8; 32]>,
+    decrypted_payload: Option<String>,
+}
+
+impl SerialMsg {
+    /// Creating a new SerialMsg requires the UUID that this is coming from and a String of what the serial interface created.
+    /// This will attempt to breakdown the message, confirm validity using HMAC and then decrypt the message inside the payload.
+    /// For potential troubleshooting, the original message used to parse the items is kept
+    /// # Errors
+    /// If the String is just too short to possibly be a valid communication from a registered sensor, this will fail
+    /// This will NOT FAIL if the UUID, IV or HMAC are wrong for the payload to decrypt successfully
+    pub fn new(source: &Uuid, msg: String) -> Result<SerialMsg, tokio_serial::Error> {
+        let msg_copy: String = msg.clone();
+        let byte_buffer: &[u8] = msg_copy.as_bytes();
+
+        if byte_buffer.len() < 50 {
+            return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::InvalidInput,
+                description: "String provided is not large enough to have valid IV, payload, and HMAC!".to_string() });
+        }
+
+        let mut iv: [u8; 16] = [0; 16];
+        let mut given_hmac: [u8; 32] = [0; 32];
+        let mut given_payload: Vec<u8> = vec![];
+        let hmac_start: usize = byte_buffer.len() - 32;
+
+        iv.copy_from_slice(&byte_buffer[0..15]);
+        given_hmac.copy_from_slice(&byte_buffer[hmac_start..]);
+
+        for bit in &byte_buffer[16..hmac_start] {
+            given_payload.push(bit.clone());
+        }
+
+        let source_uuid: Uuid = source.clone();
+        let mut decrypted: Option<String> = None;
+        if verify_hmac(source_uuid, &given_payload, given_hmac) {
+            decrypted = match decrypt_message(source_uuid, iv, &given_payload) {
+                Ok(inner) => Some(inner),
+                Err(_) => None,
+            };
+        }
+        
+        Ok(SerialMsg {
+            orig_msg: msg.clone(),
+            parsed_iv: Some(iv),
+            parsed_payload: Some(given_payload),
+            parsed_hmac: Some(given_hmac),
+            decrypted_payload: decrypted,
+        })
+    }
+    /// Clones the original string used to generate the SerialMsg.
+    /// Only helpful for troubleshooting
+    pub fn get_org_msg(&self) -> String {
+        self.orig_msg.clone()
+    }
+    /// Clones the IV parsed from the message. These should be reasonably random!
+    pub fn get_iv(&self) -> Option<[u8; 16]> {
+        self.parsed_iv.clone()
+    }
+    /// Clones the HMAC appended at the end of the payload
+    pub fn get_hmac(&self) -> Option<[u8; 32]> {
+        self.parsed_hmac.clone()
+    }
+    /// Clones the encrypted payload from the message
+    pub fn get_payload(&self) -> Option<Vec<u8>> {
+        self.parsed_payload.clone()
+    }
+    /// Checks if the payload has been decrypted but not if it was successful
+    pub fn payload_decrypted(&self) -> bool {
+        match self.decrypted_payload {
+            Some(_) => return true,
+            None => return false,
+        }
+    }
+    /// Verifies that the payload in the SerialMsg and the HMAC in the same SerialMsg match based on the provided UUID.
+    /// This will return FALSE if the payload is empty, if the HMAC is empty, if the UUID is incorrect or if the HMAC indicates the message does not match
+    pub fn verify_payload(&self, source: &Uuid) -> bool {
+        verify_hmac(source.clone(), &self.get_payload().unwrap_or(vec![0]), self.get_hmac().unwrap_or([0; 32]))
+    }
+
+    /// Verifies that the payload is decrypted successfully by checking the contained UUID.
+    /// This will return false if the message does not start with the UUID provided of if the payload was not decrypted.
+    /// A failure can indiciate either a bad IV, an incorrect UUID or a damaged/incomplete/tampered payload
+    pub fn verify_decryption(&self, source: &Uuid) -> bool {
+        if self.payload_decrypted() {
+            let local_message = self.decrypted_payload.clone().unwrap();
+            if local_message.starts_with(&source.as_simple().to_string()) {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    /// Get the String that was decrypted
+    pub fn get_decrypted_payload(&self) -> Option<String> {
+        self.decrypted_payload.clone()
+    }
+
+    /// Create a SerialReading based on info in the decrypted payload
+    /// #Errors
+    /// Will return an "Unknown" tokio_serial error with a description of what happened if this cannot make a SerialReading
+    pub fn generate_serial_reading(&self, source: &Uuid) -> Result<SerialReading, tokio_serial::Error> {
+        if self.verify_payload(source) {
+            if self.verify_decryption(source) {
+                SerialReading::parse_str_to_msg(self.get_decrypted_payload().unwrap())
+            } else {
+                return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::Unknown, description: "Payload failed content verification.".to_string() });
+            }
+        } else {
+            return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::Unknown, description: "Payload failed HMAC verification.".to_string() });
+        }
+    }
+}
+
+/// Structure to contain serial readings and their information
 #[derive(Clone, Debug)]
 pub struct SerialReading {
     source: Uuid,
@@ -96,6 +217,10 @@ pub struct SerialReading {
 }
 
 impl SerialReading {
+    pub fn new(source: Uuid) -> SerialReading {
+        SerialReading { source: source,
+                humidity: None, temp_cel: None, temp_fah: None, presence: None, threshol: None }
+    }
     pub fn parse_str_to_msg(msg: String) -> Result<SerialReading, tokio_serial::Error> {
         let msg: &str = msg.trim();
         let components: Vec<&str> = msg.split('#').collect();
@@ -114,8 +239,29 @@ impl SerialReading {
                         temp_fah: parse_str_to_float(components[3])?,
                         presence: parse_str_to_bool(components[4])?,
                         threshol: parse_str_to_bool(components[5])? })
+    }   
+}
+
+impl Display for SerialReading {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut display_message: String = String::new();
+        if let Some(humid) = self.humidity {
+            display_message = format!("{}Humidity: {}|", display_message, humid)
+        };
+        if let Some(temp) = self.temp_cel {
+            display_message = format!("{}Celsius: {}|", display_message, temp)
+        };
+        if let Some(temp) = self.temp_fah {
+            display_message = format!("{}Fahrenheit: {}|", display_message, temp)
+        };
+        if let Some(pres) = self.presence {
+            display_message = format!("{}Presense Detected: {}|", display_message, pres)
+        };
+        if let Some(thresh) = self.threshol {
+            display_message = format!("{}Threshold Open: {}|", display_message, thresh)
+        };
+        write!(f, "UUID: {}, Readings: |{}", self.source, display_message)
     }
-    
 }
 
 fn parse_str_to_bool(item: &str) -> Result<Option<bool>, tokio_serial::Error> {
@@ -197,7 +343,7 @@ pub fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilde
     }
 }
 
-/*
+/* Protocol/Max485 notes
 Wiring:
 Module     Device
 VCC <----> 5V
@@ -207,17 +353,35 @@ RO <-----> UART RX
 DI <-----> UART TX
 
 ---
-Protocol Ideas
+Protocol
 
-- New sensors requesting association send all zero'd UUID in the correct tranmission showing capability
+New sensors requesting association send all zero'd UUID in correct format showing capability in plaintext
 - New sensor format: UUID#HumidityBool#TempCBool#TempFBool#PresenceBool#ThresholdBool\n
-- New sensor response if accepted: $UUID\n
-- Command format: IV|PAYLOADwithCOMMAND|MAC\n
-(NOTE: IV will always be 16 bits first, MAC will always be 32 bits last. No separators in communication or you will foul up the encryption )
-- The number of # must be fixed inside the payload but areas in between #s do not need anything if not needed for the command
-- Command ideas: Set frequency, Set activity
-- Set frequency Command: SET#delay#timeINmilliseconds##\n
-- Set activity Command: SET#active#bool##\n
+When this information reaches the server, the server generates a UUID and saves the capabilities in the database.
+Once the DB save is confirmed, the server generates a SHA256 hash of the UUID and relies with the UUID and confirmed capabilities.
+- New sensor response if accepted: UUIDinSHA256\n
+- If not accepted (capabilities look wrong) then the process starts over
+-- UUID will time out due to invalid response and will be banned by server --
+Server compares given SHA256 with the SHA256 generated to ensure the sensor is generating SHA256 correctly and has the right UUID.
+-If the SHA256 is wrong or a timeout is reached waiting for the hash from the sensor, the UUID is banned and the server will ignore messages with that UUID.
+-If the hash is correct, the server waits for the sensor to send the sample encrypted payload to ensure the encryption is working.
+-- Payload should be a copy of what the server sent EG UUID#BOOL#BOOL#BOOL#BOOL#BOOL
+
+-----
+Example of good startup:
+Sensor: 00000000000000000000000000000000#TRUE#TRUE#TRUE#FALSE#FALSE\n
+Server: 0f3832c6201547c9a296962fd94b3e38#TRUE#TRUE#TRUE#FALSE#FALSE\n
+Sensor: 23126bb7af6b98b07f0388c7b0a4008a490f2fc4f60fe9ae46288aebaca65858\n
+*All traffic afterwards will be encrypted and have a structure of IV|PAYLOAD|HMAC without separators*
+Sensor: **Encrypted payload showing server config response to ensure encryption is valid**
+-----
+
+- The number of # must be fixed inside the payload
+-- For commands, #s can be trailing with no items inside (see examples below)
+-- For sensors, the #s need to have A if not used
+- Set frequency Command: SET#delay#timeINmilliseconds##
+- Set activity Command: SET#active#bool##
+- sensor reading example: 0f3832c6201547c9a296962fd94b3e38#A#A#A#FALSE#A
 */
 
 /// Grab a serial message if available
@@ -310,3 +474,37 @@ pub fn verify_hmac(the_uuid: Uuid, payload: &Vec<u8>, received_hmac: [u8; 32]) -
     }
 }
 
+/// Structure to contain serial communication for one device
+/// For now, we are assuming 1:1 sensor to serial interface
+#[derive(Clone, Debug)]
+pub struct SerialInterface {
+    port: tokio_serial::SerialPortBuilder,
+    uid: Uuid,
+    last_reading: Option<SerialReading>,
+}
+
+impl Default for SerialInterface {
+    fn default() -> SerialInterface {
+        SerialInterface { port: build_serial(None).unwrap(), uid: Uuid::nil(), last_reading: None }
+    }
+}
+
+impl Display for SerialInterface {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut display_message: String = format!(", Port Info: {:?}", self.port);
+        if let Some(reading) = self.last_reading.clone() {
+            display_message = format!("{}, Last Reading: {}", display_message, reading)
+        };
+        write!(f, "UUID: {}, Port Info: {}", self.uid.as_hyphenated().to_string(), display_message)
+    }
+}
+
+impl SerialInterface {
+    pub fn new(port_path: &str, set_uuid: Option<Uuid>) -> Result<SerialInterface, tokio_serial::Error> {
+        let serial_port = build_serial(Some(port_path))?;
+        match set_uuid {
+            Some(uid_set) => Ok(SerialInterface { port: serial_port, uid: uid_set, last_reading: None }),
+            None => Ok(SerialInterface { port: serial_port, uid: Uuid::nil(), last_reading: None })
+        }
+    }
+}
