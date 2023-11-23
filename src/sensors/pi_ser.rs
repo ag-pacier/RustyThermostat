@@ -20,26 +20,23 @@ use super::*;
 struct LineCodec;
 
 impl Decoder for LineCodec {
-    type Item = String;
+    type Item = Vec<u8>;
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let newline = src.as_ref().iter().position(|b| *b == b'\n');
         if let Some(n) = newline {
             let line = src.split_to(n + 1);
-            return match String::from_utf8(line.as_ref().to_vec()) {
-                Ok(s) => Ok(Some(s.to_string())),
-                Err(_) => Err(io::Error::new(io::ErrorKind::Other, "Invalid String")),
-            };
+            return Ok(Some(line.as_ref().to_vec()));
         }
         Ok(None)
     }
 }
 
-impl Encoder<String> for LineCodec {
+impl Encoder<Vec<u8>> for LineCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, _item: String, _dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, _item: Vec<u8>, _dst: &mut BytesMut) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -82,7 +79,7 @@ impl SerialCmd {
 
 /// Structure for containing raw serial messages and parsing them
 pub struct SerialMsg {
-    orig_msg: String,
+    orig_msg: Vec<u8>,
     parsed_iv: Option<[u8; 16]>,
     parsed_payload: Option<Vec<u8>>,
     parsed_hmac: Option<[u8; 32]>,
@@ -96,9 +93,8 @@ impl SerialMsg {
     /// # Errors
     /// If the String is just too short to possibly be a valid communication from a registered sensor, this will fail
     /// This will NOT FAIL if the UUID, IV or HMAC are wrong for the payload to decrypt successfully
-    pub fn new(source: &Uuid, msg: String) -> Result<SerialMsg, tokio_serial::Error> {
-        let msg_copy: String = msg.clone();
-        let byte_buffer: &[u8] = msg_copy.as_bytes();
+    pub fn new(source: &Uuid, msg: Vec<u8>) -> Result<SerialMsg, tokio_serial::Error> {
+        let byte_buffer: &[u8] = &msg;
 
         if byte_buffer.len() < 50 {
             return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::InvalidInput,
@@ -134,9 +130,9 @@ impl SerialMsg {
             decrypted_payload: decrypted,
         })
     }
-    /// Clones the original string used to generate the SerialMsg.
+    /// Clones the original vector used to generate the SerialMsg.
     /// Only helpful for troubleshooting
-    pub fn get_org_msg(&self) -> String {
+    pub fn get_org_msg(&self) -> Vec<u8> {
         self.orig_msg.clone()
     }
     /// Clones the IV parsed from the message. These should be reasonably random!
@@ -491,7 +487,7 @@ impl SerialInterface {
 
         let mut reader: tokio_util::codec::Framed<tokio_serial::SerialStream, LineCodec> = LineCodec.framed(open_stream);
 
-        let line_result: Result<String, io::Error> = match reader.next().await {
+        let line_result: Result<Vec<u8>, io::Error> = match reader.next().await {
             None => return Ok(None),
             Some(line) => line,
         };
@@ -502,5 +498,30 @@ impl SerialInterface {
             let serial_msg = SerialMsg::new(&self.uid, line_result.unwrap())?;
             return Ok(Some(serial_msg))
         }
+    }
+
+    #[allow(unused_mut)]
+    pub async fn send_command(&self, com: String) -> Result<(), tokio_serial::Error> {
+        let local_port: tokio_serial::SerialPortBuilder = self.port.clone();
+        let mut open_sink: tokio_serial::SerialStream = local_port.open_native_async()?;
+
+        #[cfg(unix)]
+        match open_sink.set_exclusive(false) {
+            Ok(_) => (),
+            Err(_) => println!("Tried and failed to set the port as not exclusive!"),
+        }
+
+        let pending_command: Result<Vec<u8>, InvalidLength> = SerialCmd::new(self.uid.clone(), None, com.clone()).build_msg();
+        if pending_command.is_err() {
+            return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::InvalidInput,
+                    description: format!("Encryption and hashing of command failed. Command issued: {}", com) });
+        } else {
+            let message: Vec<u8> = pending_command.unwrap();
+            let message_size: usize = message.len();
+            let mut writer: tokio_util::codec::Framed<tokio_serial::SerialStream, LineCodec> = LineCodec.framed(open_sink);
+            writer.forward(message).await;
+        }
+
+        Ok(())
     }
 }
