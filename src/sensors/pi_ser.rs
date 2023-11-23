@@ -1,8 +1,4 @@
 // Container for serial sensor management through a Pi
-// Use test build from RPiSerialTesting to see working example using serialport
-// Use documentation from the following to help build out
-// mio-serial: https://docs.rs/mio-serial/latest/mio_serial/index.html
-// tokio-serial: https://docs.rs/tokio-serial/latest/tokio_serial/
 
 use tokio_serial::{self, SerialPortBuilderExt};
 use tokio_util::codec::{Decoder, Encoder};
@@ -327,7 +323,7 @@ fn parse_item_for_absent(item: &str) -> Result<bool, tokio_serial::Error> {
 /// Default is /dev/ttyAMA0 at 9600 baud with 8 data bits, no parity, and 1 stop bit
 /// # Error
 /// If the path provided or the default path can't be found, this will error out with NoDevice
-pub fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilder, tokio_serial::Error> {
+fn build_serial(path: Option<&str>) -> Result<tokio_serial::SerialPortBuilder, tokio_serial::Error> {
     let test_path = match path {
         Some(tpath) => tpath,
         None => "/dev/ttyAMA0",
@@ -384,29 +380,8 @@ Sensor: **Encrypted payload showing server config response to ensure encryption 
 - sensor reading example: 0f3832c6201547c9a296962fd94b3e38#A#A#A#FALSE#A
 */
 
-/// Grab a serial message if available
-#[allow(unused_mut)]
-pub async fn get_serial_msg(ser_built: tokio_serial::SerialPortBuilder) -> Result<Option<SerialReading>, tokio_serial::Error> {
-    let mut my_open_serial: tokio_serial::SerialStream = ser_built.open_native_async()?;
-
-    #[cfg(unix)]
-    match my_open_serial.set_exclusive(false) {
-        Ok(_) => (),
-        Err(_) => println!("Tried and failed to set the port as not exclusive!"),
-    }
-
-    let mut reader: tokio_util::codec::Framed<tokio_serial::SerialStream, LineCodec> = LineCodec.framed(my_open_serial);
-
-    let line_result: String = match reader.next().await {
-        None => return Ok(None),
-        Some(line) => line?,
-    };
-
-    return Ok(Some(SerialReading::parse_str_to_msg(line_result)?))
-}
-
 /// Take a UUID, an IV and the message to encrypt and create a Vector of bytes that represents that encrypted message
-pub fn encrypt_message(dest: Uuid, iv: [u8; 16], mess: &String) -> Vec<u8> {
+fn encrypt_message(dest: Uuid, iv: [u8; 16], mess: &String) -> Vec<u8> {
     let mut new_key: [u8; 32] = [0; 32];
     let mut i: usize = 0;
 
@@ -423,7 +398,7 @@ pub fn encrypt_message(dest: Uuid, iv: [u8; 16], mess: &String) -> Vec<u8> {
 /// # Errors
 /// If the decrypted bytes can't be made into a string, this will error
 /// At this time, this will NOT error if the wrong message was decrypted or decrypted incorrectly!
-pub fn decrypt_message(source: Uuid, iv: [u8; 16], payload: &Vec<u8>) -> Result<String, std::string::FromUtf8Error> {
+fn decrypt_message(source: Uuid, iv: [u8; 16], payload: &Vec<u8>) -> Result<String, std::string::FromUtf8Error> {
     let mut new_key: [u8; 32] = [0; 32];
     let mut i: usize = 0;
 
@@ -438,7 +413,7 @@ pub fn decrypt_message(source: Uuid, iv: [u8; 16], payload: &Vec<u8>) -> Result<
 }
 
 /// Generate an HMAC based on the UUID and a given encrypted payload
-pub fn generate_hmac(the_uuid: Uuid, payload: &Vec<u8>) -> Result<[u8; 32], InvalidLength> {
+fn generate_hmac(the_uuid: Uuid, payload: &Vec<u8>) -> Result<[u8; 32], InvalidLength> {
     type HmacSha256 = Hmac<sha2::Sha256>;
 
     let mut final_mac: [u8; 32] = [0; 32];
@@ -459,7 +434,7 @@ pub fn generate_hmac(the_uuid: Uuid, payload: &Vec<u8>) -> Result<[u8; 32], Inva
 
 /// Verify a given UUID and encrypted payload against the extracted HMAC
 /// Returns true if there is a match and false if there are any issues
-pub fn verify_hmac(the_uuid: Uuid, payload: &Vec<u8>, received_hmac: [u8; 32]) -> bool {
+fn verify_hmac(the_uuid: Uuid, payload: &Vec<u8>, received_hmac: [u8; 32]) -> bool {
     type HmacSha256 = Hmac<sha2::Sha256>;
 
     let mut mac = match HmacSha256::new_from_slice(the_uuid.as_simple().to_string().as_bytes()) {
@@ -480,22 +455,17 @@ pub fn verify_hmac(the_uuid: Uuid, payload: &Vec<u8>, received_hmac: [u8; 32]) -
 pub struct SerialInterface {
     port: tokio_serial::SerialPortBuilder,
     uid: Uuid,
-    last_reading: Option<SerialReading>,
 }
 
 impl Default for SerialInterface {
     fn default() -> SerialInterface {
-        SerialInterface { port: build_serial(None).unwrap(), uid: Uuid::nil(), last_reading: None }
+        SerialInterface { port: build_serial(None).unwrap(), uid: Uuid::nil() }
     }
 }
 
 impl Display for SerialInterface {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut display_message: String = format!(", Port Info: {:?}", self.port);
-        if let Some(reading) = self.last_reading.clone() {
-            display_message = format!("{}, Last Reading: {}", display_message, reading)
-        };
-        write!(f, "UUID: {}, Port Info: {}", self.uid.as_hyphenated().to_string(), display_message)
+        write!(f, "UUID: {}, Port Info: {:?}", self.uid.as_hyphenated().to_string(), self.port)
     }
 }
 
@@ -503,8 +473,34 @@ impl SerialInterface {
     pub fn new(port_path: &str, set_uuid: Option<Uuid>) -> Result<SerialInterface, tokio_serial::Error> {
         let serial_port = build_serial(Some(port_path))?;
         match set_uuid {
-            Some(uid_set) => Ok(SerialInterface { port: serial_port, uid: uid_set, last_reading: None }),
-            None => Ok(SerialInterface { port: serial_port, uid: Uuid::nil(), last_reading: None })
+            Some(uid_set) => Ok(SerialInterface { port: serial_port, uid: uid_set }),
+            None => Ok(SerialInterface { port: serial_port, uid: Uuid::nil() })
+        }
+    }
+
+    #[allow(unused_mut)]
+    pub async fn get_message(&self) -> Result<Option<SerialMsg>, tokio_serial::Error> {
+        let local_port: tokio_serial::SerialPortBuilder = self.port.clone();
+        let mut open_stream: tokio_serial::SerialStream = local_port.open_native_async()?;
+
+        #[cfg(unix)]
+        match open_stream.set_exclusive(false) {
+            Ok(_) => (),
+            Err(_) => println!("Tried and failed to set the port as not exclusive!"),
+        }
+
+        let mut reader: tokio_util::codec::Framed<tokio_serial::SerialStream, LineCodec> = LineCodec.framed(open_stream);
+
+        let line_result: Result<String, io::Error> = match reader.next().await {
+            None => return Ok(None),
+            Some(line) => line,
+        };
+        if line_result.is_err() {
+            return Err(tokio_serial::Error { kind: tokio_serial::ErrorKind::Io(line_result.unwrap_err().kind()),
+                    description: format!("Error reading stream while using: {:?}", self.port) })
+        } else {
+            let serial_msg = SerialMsg::new(&self.uid, line_result.unwrap())?;
+            return Ok(Some(serial_msg))
         }
     }
 }
