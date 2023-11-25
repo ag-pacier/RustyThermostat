@@ -1,5 +1,6 @@
 // Container for serial sensor management through a Pi
 
+use futures::SinkExt;
 use tokio_serial::{self, SerialPortBuilderExt};
 use tokio_util::codec::{Decoder, Encoder};
 use futures::stream::StreamExt;
@@ -36,7 +37,11 @@ impl Decoder for LineCodec {
 impl Encoder<Vec<u8>> for LineCodec {
     type Error = io::Error;
 
-    fn encode(&mut self, _item: Vec<u8>, _dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: Vec<u8>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let item_size: usize = item.len();
+        dst.reserve(5 + item_size);
+        let byte_version: &[u8] = &item;
+        dst.extend_from_slice(byte_version);
         Ok(())
     }
 }
@@ -519,7 +524,7 @@ impl SerialInterface {
             let message: Vec<u8> = pending_command.unwrap();
             let message_size: usize = message.len();
             let mut writer: tokio_util::codec::Framed<tokio_serial::SerialStream, LineCodec> = LineCodec.framed(open_sink);
-            writer.forward(message).await;
+            
         }
 
         Ok(())
