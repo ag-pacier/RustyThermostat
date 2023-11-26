@@ -1,5 +1,6 @@
 pub mod weather;
 pub mod schema;
+pub mod api;
 
 #[macro_use] extern crate rocket;
 
@@ -10,5 +11,5 @@ fn index() -> &'static str {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![index])
+    rocket::build().mount("/", routes![index, api::api_index])
 }
