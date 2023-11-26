@@ -1,5 +1,27 @@
 # Rusty Thermostat
- 
+
+## Web API Branch
+This branch is being used to experiment with and develop the web API side of this. When in working order this will:
+
+- Interact with the database backend to confirm active IDs for:
+-- Zones
+-- Controllers
+-- Sensors
+- Utilize authentication to validate:
+-- Only allowed devices (controllers and sensors) can interact with the system
+-- Only valid users can see see settings or conditions
+- Facilitate:
+-- Toggling controller's behavior
+-- Adding/Removing/Changing Controllers
+-- Adding/Removing/Changing Sensors
+-- Reviewing sensor readings
+-- Reviewing current settings for controllers and sensors
+-- Adding/Removing/Changing Zones
+
+What this is NOT is:
+- A user friendly web interface
+
+## From Main
 Statement: Create a server application using primarily Rust that runs on Linux which fetches and stores weather information, in-home stats and controls heating and cooling "intelligently" EG don't turn on the heat if it's hot outside, don't turn on the AC if it is cold outside, allow for scheduling of control etc.
 
 Needed:
