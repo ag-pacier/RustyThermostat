@@ -1,6 +1,11 @@
 use rocket::response::status;
 use uuid::Uuid;
 
+// Supporting functions to generate content for API pages goes here
+
+
+// Routes go below here for the API
+// GET routes
 #[get("/api")]
 pub fn api_index() -> &'static str {
     "Hello, API!"
@@ -9,6 +14,11 @@ pub fn api_index() -> &'static str {
 #[get("/api/weather")]
 pub fn weather() -> &'static str {
     "Current weather"
+}
+
+#[get("/api/pollution")]
+pub fn pollution() -> &'static str {
+    "Current pollution"
 }
 
 #[get("/api/sensor/<id>")]
@@ -30,3 +40,14 @@ pub fn controller_status(id: &str) -> Result<String, status::BadRequest<String>>
         Ok(format!("The ID provided: {} can be seen like this: {}", id, parsed_uuid.unwrap().as_hyphenated().to_string()))
     }
 }
+
+#[get("/api/zone/<id>")]
+pub fn zone_status(id: u32) -> Result<String, status::BadRequest<String>> {
+    Ok(format!("Info for zone {}:", id))
+}
+
+// PUT routes
+
+// PATCH routes
+
+// DELETE routes
