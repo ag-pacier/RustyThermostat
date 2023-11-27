@@ -193,7 +193,7 @@ impl WeatherResponse {
             let unpacked: RainInfo = rain.unwrap();
             reading.rain1_h = Set(Some(unpacked.onehour.into()));
             if unpacked.threehour.is_some() {
-                let threehour: f64 = unpacked.threehour.unwrap().into();
+                let threehour: f32 = unpacked.threehour.unwrap();
                 reading.rain3_h = Set(Some(threehour));
             }
         }
@@ -201,7 +201,7 @@ impl WeatherResponse {
             let unpacked: SnowInfo = snow.unwrap();
             reading.snow1_h = Set(Some(unpacked.onehour.into()));
             if unpacked.threehour.is_some() {
-                let threehour: f64 = unpacked.threehour.unwrap().into();
+                let threehour: f32 = unpacked.threehour.unwrap();
                 reading.snow3_h = Set(Some(threehour));
             }
         }

@@ -6,7 +6,7 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "Schedules")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: Uuid,
     pub active: bool,
     #[sea_orm(column_type = "Text")]
     pub name: String,
@@ -25,9 +25,9 @@ pub struct Model {
     #[sea_orm(column_name = "dateEnd")]
     pub date_end: Option<Date>,
     #[sea_orm(column_name = "tempMin", column_type = "Double", nullable)]
-    pub temp_min: Option<f64>,
+    pub temp_min: Option<f32>,
     #[sea_orm(column_name = "tempMax", column_type = "Double", nullable)]
-    pub temp_max: Option<f64>,
+    pub temp_max: Option<f32>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

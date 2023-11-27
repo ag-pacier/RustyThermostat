@@ -15,8 +15,8 @@ pub struct Model {
     pub time_added: DateTime,
     #[sea_orm(column_name = "lastChanged")]
     pub last_changed: Option<DateTime>,
-    #[sea_orm(column_name = "currentTemp", column_type = "Double", nullable)]
-    pub current_temp: Option<f64>,
+    #[sea_orm(column_name = "currentTemp", column_type = "Float", nullable)]
+    pub current_temp: Option<f32>,
     #[sea_orm(column_name = "currentHumid")]
     pub current_humid: Option<i32>,
     #[sea_orm(column_name = "systemActive")]

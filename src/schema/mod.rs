@@ -7,7 +7,6 @@ pub mod change_source;
 pub mod communication;
 pub mod controllers;
 pub mod env_capability;
-pub mod home_summary;
 pub mod hva_cactivity;
 pub mod manual_change_history;
 pub mod pollution_reading;
