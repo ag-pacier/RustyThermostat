@@ -3,6 +3,8 @@ use rocket::serde::json::Json;
 use uuid::Uuid;
 use crate::weather::WeatherResponse;
 
+pub mod sensor;
+
 // Supporting functions to generate content for API pages goes here
 fn test_weather() -> WeatherResponse {
     WeatherResponse::test_my_weather()
