@@ -2,43 +2,10 @@
 use sea_orm::ActiveValue::{Set, NotSet};
 use serde_derive::{Serialize, Deserialize};
 use chrono::{Utc, NaiveDateTime};
-use std::io::Error;
 use uuid::Uuid;
 use serde_json;
-use jsonwebtoken;
+use rand::{thread_rng, Rng};
 use crate::schema::{sensors, sensor_reading_history};
-
-// Structure to contain JWT info
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct JWTClaims {
-    pub iss: String,
-    pub sub: String,
-    pub groups: String,
-    pub exp: u64,
-}
-
-impl JWTClaims {
-    pub fn new(subject: Uuid) -> JWTClaims {
-        let mut new_jwt: JWTClaims = JWTClaims::default();
-        new_jwt.sub = subject.as_simple().to_string();
-        new_jwt
-    }
-}
-
-impl Default for JWTClaims {
-    fn default() -> Self {
-        let expiration: u64 = Utc::now()
-            .checked_add_signed(chrono::Duration::seconds(900))
-            .expect("Invalid timestamp")
-            .timestamp()
-            .try_into().unwrap_or(jsonwebtoken::get_current_timestamp());
-        JWTClaims {
-            iss: "Rusty Thermostat".to_string(),
-            sub: "DebugSub".to_string(),
-            groups: "WebSensor".to_string(),
-            exp: expiration }
-    }
-}
 
 // Structure to contain each web sensor
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -46,7 +13,7 @@ pub struct WebSensor {
     pub id: Uuid,
     pub active: bool,
     pub name: String,
-    pub token: String,
+    pub token: [u8; 32],
     pub associated_zone: Option<i32>,
     pub time_added: NaiveDateTime,
     pub time_updated: Option<NaiveDateTime>,
@@ -64,7 +31,8 @@ impl WebSensor {
         let mut new_sensor: WebSensor = WebSensor::default();
         new_sensor.set_name(name);
         new_sensor.set_zone(zone);
-        //TODO: UUID check and input into DB
+        new_sensor.id = Uuid::new_v4();
+        new_sensor.set_token();
         new_sensor
     }
     fn update_time(&mut self) -> () {
@@ -72,6 +40,16 @@ impl WebSensor {
     }
     fn update_com_last(&mut self) -> () {
         self.com_last = Some(Utc::now().naive_utc());
+    }
+    pub fn set_token(&mut self) -> () {
+        let mut rng = thread_rng();
+        let mut rand_range: [u8; 32] = [0; 32];
+        let mut i: usize = 0;
+        while i < rand_range.len() {
+            rand_range[i] = rng.gen();
+            i = i + 1;
+        }
+        self.token = rand_range;
     }
     pub fn set_humidity(&mut self, humidity: Option<i32>) -> () {
         self.current_humid = humidity;
@@ -113,7 +91,7 @@ impl Default for WebSensor {
             id: Uuid::nil(),
             active: false,
             name: "Uninitialized Web Sensor".to_string(),
-            token: "PendingIssuance".to_string(),
+            token: [0; 32],
             associated_zone: None,
             time_added: Utc::now().naive_utc(),
             time_updated: None,

@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::weather::WeatherResponse;
 
 pub mod sensor;
+pub mod jwttokens;
 
 // Supporting functions to generate content for API pages goes here
 fn test_weather() -> WeatherResponse {

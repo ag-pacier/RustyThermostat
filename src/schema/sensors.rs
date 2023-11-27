@@ -10,8 +10,8 @@ pub struct Model {
     pub active: bool,
     #[sea_orm(column_name = "Name", column_type = "Text")]
     pub name: String,
-    #[sea_orm(column_name = "Token", column_type = "Text", unique)]
-    pub token: String,
+    #[sea_orm(column_name = "Token", column_type = "VarBinary(32)")]
+    pub token: Vec<u8>,
     #[sea_orm(column_name = "associatedZone")]
     pub associated_zone: Option<i32>,
     #[sea_orm(column_name = "timeAdded")]
