@@ -207,6 +207,40 @@ impl WeatherResponse {
         }
         reading
     }
+
+    pub fn test_my_weather() -> WeatherResponse {
+        let weath_info: WeatherInfo = WeatherInfo {
+            id: 69,
+            main: "Sunny".to_string(),
+            description: "It's totally sunny".to_string(),
+            icon: "2px.png".to_string() };
+        let win_info: WindInfo = WindInfo {
+            speed: 69.6,
+            deg: 320,
+            gust: 69.6 };
+        let temp_info: TemperatureInfo = TemperatureInfo {
+            temp: 70.0,
+            feels_like: 69.0,
+            pressure: 20,
+            humidity: 30,
+            grnd_level: 30 };
+        let system_i: SysInfo = SysInfo {
+            country: "USofA".to_string(),
+            sunrise: 3299980,
+            sunset: 3367594 };
+
+        WeatherResponse {
+            weather: weath_info,
+            base: "Stations".to_string(),
+            temperature: temp_info,
+            visibility: 100000,
+            wind: win_info,
+            rain: None,
+            snow: None,
+            clouds: CloudInfo { all: 15 },
+            dt: 23239239,
+            sys_info: system_i }
+    }
 }
 
 // Current weather stats from the WeatherResponse are stored here
