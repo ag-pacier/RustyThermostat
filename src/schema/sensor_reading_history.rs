@@ -6,12 +6,14 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "SensorReadingHistory")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: Uuid,
+    pub id: i32,
     #[sea_orm(column_name = "sensorID")]
-    pub sensor_id: i32,
+    pub sensor_id: Uuid,
     pub timestamp: DateTime,
-    #[sea_orm(column_name = "readingTemp", column_type = "Float", nullable)]
-    pub reading_temp: Option<f32>,
+    #[sea_orm(column_name = "readingTempF", column_type = "Float", nullable)]
+    pub reading_temp_f: Option<f32>,
+    #[sea_orm(column_name = "readingTempC", column_type = "Float", nullable)]
+    pub reading_temp_c: Option<f32>,
     #[sea_orm(column_name = "readingHumidity")]
     pub reading_humidity: Option<i32>,
     #[sea_orm(column_name = "readingPresence")]
