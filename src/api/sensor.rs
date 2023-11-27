@@ -42,7 +42,7 @@ impl WebSensor {
         self.com_last = Some(Utc::now().naive_utc());
     }
     pub fn set_token(&mut self) -> () {
-        let mut rng = thread_rng();
+        let mut rng: rand::prelude::ThreadRng = thread_rng();
         let mut rand_range: [u8; 32] = [0; 32];
         let mut i: usize = 0;
         while i < rand_range.len() {
@@ -103,4 +103,18 @@ impl Default for WebSensor {
             presence: None,
             threshold_open: None }
     }
+}
+
+// Structure to contain each web sensor reading
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WebSensorReading {
+    pub id: i32,
+    pub sensor_id: Uuid,
+    pub associated_zone: Option<i32>,
+    pub timestamp: NaiveDateTime,
+    pub current_temp_c: Option<f32>,
+    pub current_temp_f: Option<f32>,
+    pub current_humid: Option<i32>,
+    pub presence: Option<bool>,
+    pub threshold_open: Option<bool>,
 }
