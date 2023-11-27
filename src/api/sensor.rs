@@ -27,9 +27,50 @@ pub struct WebSensor {
 }
 
 impl WebSensor {
+    pub fn new_sensor(name: String, zone: Option<i32>) -> WebSensor {
+        let mut new_sensor: WebSensor = WebSensor::default();
+        new_sensor.set_name(name);
+        new_sensor.set_zone(zone);
+        //TODO: UUID check and input into DB
+        new_sensor
+    }
+    fn update_time(&mut self) -> () {
+        self.time_updated = Some(Utc::now().naive_utc());
+    }
+    fn update_com_last(&mut self) -> () {
+        self.com_last = Some(Utc::now().naive_utc());
+    }
     pub fn set_humidity(&mut self, humidity: Option<i32>) -> () {
         self.current_humid = humidity;
-        self.time_updated = Some(Utc::now().naive_utc());
+        self.update_time();
+    }
+    pub fn set_name(&mut self, new_name: String) -> () {
+        self.name = new_name;
+        self.update_time();
+    }
+    pub fn set_active(&mut self, is_active: bool) -> () {
+        self.active = is_active;
+        self.update_time();
+    }
+    pub fn set_pres(&mut self, is_pres: Option<bool>) -> () {
+        self.presence = is_pres;
+        self.update_time();
+    }
+    pub fn set_thresh(&mut self, is_thresh: Option<bool>) -> () {
+        self.threshold_open = is_thresh;
+        self.update_time();
+    }
+    pub fn set_zone(&mut self, new_zone: Option<i32>) -> () {
+        self.associated_zone = new_zone;
+        self.update_time();
+    }
+    pub fn set_f_temp(&mut self, f_temp: Option<f64>) -> () {
+        self.current_temp_f = f_temp;
+        self.update_time();
+    }
+    pub fn set_c_temp(&mut self, c_temp: Option<f64>) -> () {
+        self.current_temp_c = c_temp;
+        self.update_time();
     }
 }
 
