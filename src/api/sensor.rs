@@ -83,6 +83,23 @@ impl WebSensor {
         self.current_temp_c = c_temp;
         self.update_time();
     }
+
+    pub fn generate_db_model_new(&self) -> sensors::ActiveModel {
+        sensors::ActiveModel {
+            id: Set(self.id),
+            active: Set(self.active),
+            name: Set(self.name.clone()),
+            token: Set(self.token.into()),
+            associated_zone: Set(self.associated_zone),
+            time_added: Set(self.time_added),
+            time_updated: Set(self.time_updated),
+            com_type: Set(self.com_type),
+            com_last: Set(self.com_last),
+            current_temp: Set(self.current_temp_f),
+            current_humid: Set(self.current_humid),
+            presence: Set(self.presence),
+            threshold_open: Set(self.threshold_open) }
+    }
 }
 
 impl Default for WebSensor {
@@ -117,4 +134,72 @@ pub struct WebSensorReading {
     pub current_humid: Option<i32>,
     pub presence: Option<bool>,
     pub threshold_open: Option<bool>,
+}
+
+impl WebSensorReading {
+    pub fn blank_new() -> WebSensorReading {
+        WebSensorReading::default()
+    }
+
+    pub fn new(source: Uuid) -> WebSensorReading {
+        let mut new_reading: WebSensorReading = WebSensorReading::default();
+        new_reading.set_uuid(source);
+        new_reading
+    }
+
+    pub fn from_web_sensor(sensor: &WebSensor) -> WebSensorReading {
+        let local_sensor: WebSensor = sensor.clone();
+        let mut reading: WebSensorReading = WebSensorReading::default();
+        reading.set_uuid(local_sensor.id);
+        if let Some(zone) = local_sensor.associated_zone {
+            reading.associated_zone = Some(zone);
+        }
+        if let Some(temp) = local_sensor.current_temp_c {
+            reading.current_temp_c = Some(temp);
+        }
+        if let Some(temp) = local_sensor.current_temp_f {
+            reading.current_temp_f = Some(temp);
+        }
+        if let Some(humid) = local_sensor.current_humid {
+            reading.current_humid = Some(humid);
+        }
+        if let Some(presence) = local_sensor.presence {
+            reading.presence = Some(presence);
+        }
+        if let Some(threshold) = local_sensor.threshold_open {
+            reading.threshold_open = Some(threshold);
+        }
+        reading
+    }
+
+    pub fn set_uuid(&mut self, source: Uuid) -> () {
+        self.sensor_id = source;
+    }
+
+    pub fn generate_db_model(&self) -> sensor_reading_history::ActiveModel {
+        sensor_reading_history::ActiveModel {
+            id: NotSet,
+            sensor_id: Set(self.sensor_id),
+            timestamp: Set(self.timestamp),
+            reading_temp_f: Set(self.current_temp_f),
+            reading_temp_c: Set(self.current_temp_c),
+            reading_humidity: Set(self.current_humid),
+            reading_presence: Set(self.presence),
+            reading_threshold_open: Set(self.threshold_open) }
+    }
+}
+
+impl Default for WebSensorReading {
+    fn default() -> Self {
+        WebSensorReading {
+            id: 0,
+            sensor_id: Uuid::nil(),
+            associated_zone: None,
+            timestamp: Utc::now().naive_utc(),
+            current_temp_c: None,
+            current_temp_f: None,
+            current_humid: None,
+            presence: None,
+            threshold_open: None }
+    }
 }
