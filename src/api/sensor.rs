@@ -3,7 +3,6 @@ use sea_orm::ActiveValue::{Set, NotSet};
 use serde_derive::{Serialize, Deserialize};
 use chrono::{Utc, NaiveDateTime};
 use uuid::Uuid;
-use serde_json;
 use rand::{thread_rng, Rng};
 use crate::schema::{sensors, sensor_reading_history};
 
@@ -95,11 +94,13 @@ impl WebSensor {
             time_updated: Set(self.time_updated),
             com_type: Set(self.com_type),
             com_last: Set(self.com_last),
-            current_temp: Set(self.current_temp_f),
+            current_temp_f: Set(self.current_temp_f),
+            current_temp_c: Set(self.current_temp_c),
             current_humid: Set(self.current_humid),
             presence: Set(self.presence),
             threshold_open: Set(self.threshold_open) }
     }
+
 }
 
 impl Default for WebSensor {
@@ -202,4 +203,9 @@ impl Default for WebSensorReading {
             presence: None,
             threshold_open: None }
     }
+}
+
+pub async fn new_reading(sensor: &mut WebSensor) -> Result<(), sea_orm::error::RuntimeErr> {
+    // TODO: Need to figure out how I'm going to manage the DB on this. Can't delay much longer
+    Ok(())
 }

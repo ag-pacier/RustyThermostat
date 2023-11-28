@@ -22,8 +22,10 @@ pub struct Model {
     pub com_type: i32,
     #[sea_orm(column_name = "comLast")]
     pub com_last: Option<DateTime>,
-    #[sea_orm(column_name = "currentTemp", column_type = "Float", nullable)]
-    pub current_temp: Option<f32>,
+    #[sea_orm(column_name = "currentTempF", column_type = "Float", nullable)]
+    pub current_temp_f: Option<f32>,
+    #[sea_orm(column_name = "currentTempC", column_type = "Float", nullable)]
+    pub current_temp_c: Option<f32>,
     #[sea_orm(column_name = "currentHumid")]
     pub current_humid: Option<i32>,
     pub presence: Option<bool>,
