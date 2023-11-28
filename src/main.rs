@@ -1,5 +1,6 @@
 pub mod weather;
 pub mod schema;
+pub mod dbman;
 
 #[macro_use] extern crate rocket;
 
