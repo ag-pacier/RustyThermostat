@@ -6,6 +6,7 @@ use sea_orm::{Database, ConnectOptions, DatabaseConnection, DbErr};
 
 // Structure for the database
 // Default will create a SQLite in-memory DB with debug logging
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 struct DBConfig {
     protocol: String,
@@ -27,7 +28,11 @@ struct DBConfig {
 
 impl DBConfig {
     /// Creates a DBConfig that makes assumptions based on a postgresql setup
-    /// dbpath needs to be 
+    /// dbhost needs to be the host running the postgresql software
+    /// user & pass must be valid users with sufficent privledges to perform all application functions
+    /// db needs to be the specific database created for the application
+    /// If needed, this can accept a schema path and a port number
+    /// Port will default to PostgreSQL default of 5432/TCP
     pub fn new_postgres(dbhost: String, user: String, pass: String, db: String, schema_path: Option<String>, port: Option<u32>,) -> DBConfig {
         DBConfig {
             protocol: "postgres://".to_string(),
@@ -47,6 +52,8 @@ impl DBConfig {
             schema_path: schema_path }
     }
 
+    /// Creates a DBConfig that makes assumptions based on a SQLite setup
+    /// dbpath is expecting a path that starts with either the drive letter or the first folder closest to root
     pub fn new_sqlite(dbpath: String) -> DBConfig {
         let mut new_db: DBConfig = DBConfig::default();
         new_db.protocol = "sqlite://".to_string();
@@ -54,6 +61,7 @@ impl DBConfig {
         new_db
     }
 
+    /// Generates the URI based on what is available in the DBConfig
     fn build_connect_string(&self) -> String {
         let local_config: DBConfig = self.clone();
         let mut connect_string: String = self.protocol.clone();
@@ -74,6 +82,7 @@ impl DBConfig {
         connect_string
     }
 
+    /// Returns a String showing if logging is on and what level
     pub fn check_logging(&self) -> String {
         let log_level: &str = match self.log_level {
             log::LevelFilter::Off => "OFF",
@@ -86,6 +95,7 @@ impl DBConfig {
         format!("Logging enabled: {} and set to: {}", self.log, log_level)
     }
 
+    // Generates the connection options based on the DBConfig
     pub fn set_connect_options(&self) -> ConnectOptions {
         let local_config: DBConfig = self.clone();
         let mut opt = ConnectOptions::new(local_config.build_connect_string());
