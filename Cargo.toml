@@ -15,5 +15,5 @@ reqwest = "^0.11.17"
 sea-orm = { version = "0.12", features = [ "sqlx-postgres", "runtime-tokio-rustls", "macros", "with-chrono", "with-uuid" ] }
 tokio = { version = "1", features = ["full"] }
 rocket = "=0.5.0-rc.4"
-log = { version = "0.4.20", features = ["std", "serde" ] }
-config = { version = "0.13.4", features = ["toml"] }
+log = { version = "0.4.20", features = [ "std", "serde" ] }
+figment = { version = "0.10.12", features = [ "toml", "env" ]}
