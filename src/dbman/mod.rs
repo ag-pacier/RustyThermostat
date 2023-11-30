@@ -1,29 +1,30 @@
 // Library for containing database logic
 
 use log;
+use serde_derive::Deserialize;
 use std::{fmt, time::Duration};
 use sea_orm::{Database, ConnectOptions, DatabaseConnection, DbErr};
 
 // Structure for the database
 // Default will create a SQLite in-memory DB with debug logging
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
-struct DBConfig {
-    protocol: String,
-    port: Option<u32>,
-    dbhost: String,
-    db_db: Option<String>,
-    acct: Option<String>,
-    pass: Option<String>,
-    con_min: Option<u32>,
-    con_max: Option<u32>,
-    timeout_con: Option<u64>,
-    timeout_acq: Option<u64>,
-    timeout_idle: Option<u64>,
-    max_life: Option<u64>,
-    log: bool,
-    log_level: log::LevelFilter,
-    schema_path: Option<String>,
+#[derive(Clone, Debug, Deserialize)]
+pub struct DBConfig {
+    pub protocol: String,
+    pub port: Option<u32>,
+    pub dbhost: String,
+    pub db_db: Option<String>,
+    pub acct: Option<String>,
+    pub pass: Option<String>,
+    pub con_min: Option<u32>,
+    pub con_max: Option<u32>,
+    pub timeout_con: Option<u64>,
+    pub timeout_acq: Option<u64>,
+    pub timeout_idle: Option<u64>,
+    pub max_life: Option<u64>,
+    pub log: bool,
+    pub log_level: log::LevelFilter,
+    pub schema_path: Option<String>,
 }
 
 impl DBConfig {
