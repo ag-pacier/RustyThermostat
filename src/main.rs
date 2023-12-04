@@ -1,12 +1,10 @@
 use figment::{Figment, providers::{Format, Toml, Env}};
 use serde_derive::Deserialize;
-use simplelog;
 
 pub mod weather;
 pub mod schema;
 pub mod dbman;
 
-#[macro_use] extern crate log;
 #[macro_use] extern crate rocket;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -174,36 +172,6 @@ fn parse_db(fig: &AppConfiguration) -> dbman::DBConfig {
     }
 
     data_config
-}
-
-fn parse_log(fig: &AppConfiguration) -> () {
-    let log_sets: LogSettings = fig.logging.clone();
-    let mut log_leveling: simplelog::LevelFilter = simplelog::LevelFilter::Error;
-    if log_sets.log_level.is_some() {
-        match log_sets.log_level.unwrap().to_lowercase().as_str() {
-            "debug" => log_leveling = simplelog::LevelFilter::Debug,
-            "info" => log_leveling = simplelog::LevelFilter::Info,
-            "error" => log_leveling = simplelog::LevelFilter::Error,
-            "warn" => log_leveling = simplelog::LevelFilter::Warn,
-            "trace" => log_leveling = simplelog::LevelFilter::Trace,
-            "off" => log_leveling = simplelog::LevelFilter::Off,
-            &_ => log_leveling = simplelog::LevelFilter::Error,
-        }
-    }
-    if log_sets.enabled {
-        let file_logger: Box<simplelog::WriteLogger<std::fs::File>> = simplelog::WriteLogger::new(
-            log_leveling,
-            simplelog::Config::default(),
-            std::fs::File::create(log_sets.log_location.unwrap_or("./rusty.log".to_string())).unwrap());
-        let term_logger: Box<simplelog::TermLogger> = simplelog::TermLogger::new(
-            simplelog::LevelFilter::Error,
-            simplelog::Config::default(),
-            simplelog::TerminalMode::Mixed,
-            simplelog::ColorChoice::Auto);
-        simplelog::CombinedLogger::init(vec![file_logger, term_logger]).unwrap();
-    } else {
-        let _ = simplelog::TermLogger::init(log_leveling, simplelog::Config::default(), simplelog::TerminalMode::Stderr, simplelog::ColorChoice::Auto);
-    }
 }
 
 #[get("/")]
