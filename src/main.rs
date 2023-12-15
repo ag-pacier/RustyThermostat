@@ -1,4 +1,4 @@
-use figment::{Figment, providers::{Format, Toml, Env}};
+use rocket::figment::providers::{Toml, Format, Env};
 use serde_derive::Deserialize;
 
 pub mod weather;
@@ -11,7 +11,6 @@ pub mod dbman;
 struct AppConfiguration {
     weather: WeatherSettings,
     database: DatabaseSettings,
-    logging: LogSettings,
 }
 
 impl Default for AppConfiguration {
@@ -20,25 +19,6 @@ impl Default for AppConfiguration {
         AppConfiguration {
             weather: WeatherSettings::default(),
             database: DatabaseSettings::default(),
-            logging: LogSettings::default()
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct LogSettings {
-    enabled: bool,
-    log_level: Option<String>,
-    log_location: Option<String>
-}
-
-impl Default for LogSettings {
-    fn default() -> Self {
-        trace!("Using default log config!");
-        LogSettings {
-            enabled: true,
-            log_level: Some("debug".to_string()),
-            log_location: Some("./rusty.log".to_string())
         }
     }
 }
@@ -108,18 +88,6 @@ impl Default for DatabaseSettings {
     }
 }
 
-fn pull_configuration() -> AppConfiguration {
-    let fig_config: Figment = Figment::new()
-    .merge(Toml::file("/../../config/rusty_thermostat.toml"))
-    .merge(Env::prefixed("RUSTY_THERMO_"));
-
-    debug!("Pulled configuration");
-    match fig_config.extract() {
-        Ok(extracted) => extracted,
-        Err(_) => AppConfiguration::default()
-    }
-}
-
 async fn parse_weather(fig: &AppConfiguration) -> Result<weather::Configuration, weather::APIError> {
     let mut wea_config: weather::Configuration = weather::Configuration::new();
     let wea_part: WeatherSettings = fig.weather.clone();
@@ -181,8 +149,11 @@ fn index() -> &'static str {
 
 #[launch]
 async fn rocket() -> _ {
-    let runtime_settings: AppConfiguration = pull_configuration();
-    parse_log(&runtime_settings);
+    let figment: rocket::figment::Figment = rocket::Config::figment()
+        .merge(Toml::file("config/rusty_thermostat.toml"))
+        .merge(Env::prefixed("RUSTY_THERMO_"));
+
+    let runtime_settings: AppConfiguration = figment.extract().unwrap_or(AppConfiguration::default());
     info!("Logging has been enabled");
     let _weather_settings: weather::Configuration = match runtime_settings.weather.is_active() {
         true => parse_weather(&runtime_settings).await.unwrap(),
