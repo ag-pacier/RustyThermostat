@@ -1,0 +1,10 @@
+[default]
+[default.weather]
+monitor_weather = "false"
+monitor_pollution = "false"
+zip_code = "00000"
+units = "imperial"
+openweather_apikey = "FAKEKEY"
+[default.database]
+database_type = "sqlite"
+host = "127.0.0.1"
