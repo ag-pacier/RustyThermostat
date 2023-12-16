@@ -172,7 +172,8 @@ fn parse_log(fig: &AppConfiguration) -> () {
             "error" => log_leveling = simplelog::LevelFilter::Error,
             "warn" => log_leveling = simplelog::LevelFilter::Warn,
             "trace" => log_leveling = simplelog::LevelFilter::Trace,
-            "off" => log_leveling = simplelog::LevelFilter::Off,&_ => log_leveling = simplelog::LevelFilter::Error,
+            "off" => log_leveling = simplelog::LevelFilter::Off,
+            _ => log_leveling = simplelog::LevelFilter::Error,
         }
     }
     if log_sets.enabled {
