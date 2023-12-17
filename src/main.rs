@@ -176,19 +176,21 @@ fn parse_log(fig: &AppConfiguration) -> () {
             _ => log_leveling = simplelog::LevelFilter::Error,
         }
     }
+    let logging_configuration = simplelog::ConfigBuilder::new()
+        .set_time_format_rfc3339().build();
     if log_sets.enabled {
     let file_logger: Box<simplelog::WriteLogger<std::fs::File>> = simplelog::WriteLogger::new(
         log_leveling,
-        simplelog::Config::default(),
+        logging_configuration.clone(),
         std::fs::File::create(log_sets.log_location.unwrap_or("./rusty.log".to_string())).unwrap());
     let term_logger: Box<simplelog::TermLogger> = simplelog::TermLogger::new(
         simplelog::LevelFilter::Error,
-        simplelog::Config::default(),
+        logging_configuration.clone(),
         simplelog::TerminalMode::Mixed,
         simplelog::ColorChoice::Auto);
     simplelog::CombinedLogger::init(vec![file_logger, term_logger]).unwrap();
     } else {
-    let _ = simplelog::TermLogger::init(log_leveling, simplelog::Config::default(), simplelog::TerminalMode::Stderr, simplelog::ColorChoice::Auto);
+    let _ = simplelog::TermLogger::init(log_leveling, logging_configuration.clone(), simplelog::TerminalMode::Stderr, simplelog::ColorChoice::Auto);
     }
 }
 
@@ -203,7 +205,7 @@ async fn rocket() -> _ {
         .merge(Toml::file("config/rusty_thermostat.toml"))
         .merge(Env::prefixed("RUSTY_THERMO_"));
 
-    let runtime_settings: AppConfiguration = figment.extract().unwrap_or(AppConfiguration::default());
+    let runtime_settings: AppConfiguration = figment.clone().extract().unwrap();
     parse_log(&runtime_settings);
     info!("Logging has been enabled");
     let _weather_settings: weather::Configuration = match runtime_settings.weather.is_active() {
@@ -212,5 +214,5 @@ async fn rocket() -> _ {
     };
     let _db_settings: dbman::DBConfig = parse_db(&runtime_settings);
     info!("Setting parsing complete. Starting web server now.");
-    rocket::build().mount("/", routes![index])
+    rocket::build().configure(figment).mount("/", routes![index])
 }
