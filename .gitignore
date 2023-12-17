@@ -21,5 +21,8 @@ Cargo.lock
 #ignore .env files
 *.env
 
-# ignore the regular toml file
-src/config/rocket.toml
+# ignore actual config
+config/rusty_thermostat.toml
+
+# ignore log contents
+logs/rusty.log
