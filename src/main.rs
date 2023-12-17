@@ -199,6 +199,11 @@ fn index() -> &'static str {
     "Hello, world!"
 }
 
+#[get("/dbping")]
+fn db_ping() -> &'static str {
+    "Doing my best"
+}
+
 #[launch]
 async fn rocket() -> _ {
     let figment: rocket::figment::Figment = rocket::Config::figment()
@@ -212,7 +217,13 @@ async fn rocket() -> _ {
         true => parse_weather(&runtime_settings).await.unwrap(),
         false => weather::Configuration::default()
     };
-    let _db_settings: dbman::DBConfig = parse_db(&runtime_settings);
+    let db_settings: dbman::DBConfig = parse_db(&runtime_settings);
+    let db_options: sea_orm::ConnectOptions = db_settings.set_connect_options();
+    let db: sea_orm::prelude::DatabaseConnection = dbman::begin_connection(db_options).await.unwrap();
+    match dbman::is_live(db).await {
+        Ok(()) => info!("Db looks live."),
+        Err(_) => error!("DBPing did not work."),
+    };
     info!("Setting parsing complete. Starting web server now.");
-    rocket::build().configure(figment).mount("/", routes![index])
+    rocket::build().configure(figment).mount("/", routes![index, db_ping])
 }
