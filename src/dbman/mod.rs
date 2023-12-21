@@ -185,6 +185,6 @@ pub async fn begin_connection(con_settings: ConnectOptions) -> Result<DatabaseCo
     Database::connect(con_settings).await
 }
 
-pub async fn is_live(db: DatabaseConnection) -> Result<(), DbErr> {
+pub async fn is_live(db: &DatabaseConnection) -> Result<(), DbErr> {
     db.ping().await
 }
