@@ -1,4 +1,6 @@
 use rocket::figment::providers::{Toml, Format, Env};
+use rocket::State;
+use sea_orm::DatabaseConnection;
 use serde_derive::Deserialize;
 
 pub mod weather;
@@ -200,8 +202,13 @@ fn index() -> &'static str {
 }
 
 #[get("/dbping")]
-fn db_ping() -> &'static str {
-    "Doing my best"
+async fn db_ping(db: &State<DatabaseConnection>) -> &'static str {
+    let db = db as &DatabaseConnection;
+    match dbman::is_live(db).await {
+        Ok(()) => "Db looks live.",
+        Err(_) => "DBPing did not work.",
+    }
+
 }
 
 #[launch]
@@ -220,10 +227,10 @@ async fn rocket() -> _ {
     let db_settings: dbman::DBConfig = parse_db(&runtime_settings);
     let db_options: sea_orm::ConnectOptions = db_settings.set_connect_options();
     let db: sea_orm::prelude::DatabaseConnection = dbman::begin_connection(db_options).await.unwrap();
-    match dbman::is_live(db).await {
+    match dbman::is_live(&db).await {
         Ok(()) => info!("Db looks live."),
         Err(_) => error!("DBPing did not work."),
     };
     info!("Setting parsing complete. Starting web server now.");
-    rocket::build().configure(figment).mount("/", routes![index, db_ping])
+    rocket::build().configure(figment).manage(db).mount("/", routes![index, db_ping])
 }
