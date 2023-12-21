@@ -1,0 +1,14 @@
+cli_colors = false
+[weather]
+monitor_weather = "false"
+monitor_pollution = "false"
+zip_code = "00000"
+units = "imperial"
+openweather_apikey = "FAKEKEY"
+[database]
+database_type = "sqlite"
+host = "127.0.0.1"
+[logging]
+enabled = "true"
+log_level = "debug"
+log_location = "./logs/rusty_thermostat.log"

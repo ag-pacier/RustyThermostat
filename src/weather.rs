@@ -401,14 +401,15 @@ impl fmt::Display for APIError {
 }
 
 // Relevant information for building the URL and containing the reqwest client are stored here
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Configuration {
-    base_path: String,
-    user_agent: Option<String>,
-    location: Option<GeoLocation>,
-    client: reqwest::Client,
-    api_key: Option<String>,
-    units: String,
+    pub base_path: String,
+    pub user_agent: Option<String>,
+    pub location: Option<GeoLocation>,
+    #[serde(skip_deserializing)]
+    pub client: reqwest::Client,
+    pub api_key: Option<String>,
+    pub units: String,
 }
 
 impl Configuration {
