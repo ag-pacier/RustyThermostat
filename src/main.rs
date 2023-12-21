@@ -203,7 +203,7 @@ fn index() -> &'static str {
 
 #[get("/dbping")]
 async fn db_ping(db: &State<DatabaseConnection>) -> &'static str {
-    let db = db as &DatabaseConnection;
+    let db: &DatabaseConnection = db as &DatabaseConnection;
     match dbman::is_live(db).await {
         Ok(()) => "Db looks live.",
         Err(_) => "DBPing did not work.",
