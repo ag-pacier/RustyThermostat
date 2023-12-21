@@ -20,3 +20,9 @@ Cargo.lock
 
 #ignore .env files
 *.env
+
+# ignore actual config
+config/rusty_thermostat.toml
+
+# ignore log contents
+logs/
