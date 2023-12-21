@@ -6,7 +6,7 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "ManualChangeHistory")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: Uuid,
     #[sea_orm(column_name = "changeTiming")]
     pub change_timing: DateTime,
     #[sea_orm(column_name = "changeWeather")]
@@ -15,8 +15,8 @@ pub struct Model {
     pub change_pollution: i32,
     #[sea_orm(column_name = "changeSource")]
     pub change_source: i32,
-    #[sea_orm(column_name = "newTemp", column_type = "Double", nullable)]
-    pub new_temp: Option<f64>,
+    #[sea_orm(column_name = "newTemp", column_type = "Float", nullable)]
+    pub new_temp: Option<f32>,
     #[sea_orm(column_name = "newHumidity")]
     pub new_humidity: Option<i32>,
     #[sea_orm(column_name = "changeSchedule")]

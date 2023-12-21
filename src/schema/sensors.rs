@@ -6,12 +6,12 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "Sensors")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: Uuid,
     pub active: bool,
     #[sea_orm(column_name = "Name", column_type = "Text")]
     pub name: String,
-    #[sea_orm(column_name = "Token", column_type = "Text", unique)]
-    pub token: String,
+    #[sea_orm(column_name = "Token", column_type = "VarBinary(32)")]
+    pub token: Vec<u8>,
     #[sea_orm(column_name = "associatedZone")]
     pub associated_zone: Option<i32>,
     #[sea_orm(column_name = "timeAdded")]
@@ -22,8 +22,10 @@ pub struct Model {
     pub com_type: i32,
     #[sea_orm(column_name = "comLast")]
     pub com_last: Option<DateTime>,
-    #[sea_orm(column_name = "currentTemp", column_type = "Double", nullable)]
-    pub current_temp: Option<f64>,
+    #[sea_orm(column_name = "currentTempF", column_type = "Float", nullable)]
+    pub current_temp_f: Option<f32>,
+    #[sea_orm(column_name = "currentTempC", column_type = "Float", nullable)]
+    pub current_temp_c: Option<f32>,
     #[sea_orm(column_name = "currentHumid")]
     pub current_humid: Option<i32>,
     pub presence: Option<bool>,

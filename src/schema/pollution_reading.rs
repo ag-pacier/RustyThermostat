@@ -6,26 +6,26 @@ use sea_orm::entity::prelude::*;
 #[sea_orm(table_name = "PollutionReading")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: i32,
+    pub id: Uuid,
     pub timestamp: DateTime,
     #[sea_orm(column_name = "AQI")]
     pub aqi: i32,
-    #[sea_orm(column_name = "CO", column_type = "Double")]
-    pub co: f64,
-    #[sea_orm(column_name = "NO", column_type = "Double")]
-    pub no: f64,
-    #[sea_orm(column_name = "NO2", column_type = "Double")]
-    pub no2: f64,
-    #[sea_orm(column_name = "O3", column_type = "Double")]
-    pub o3: f64,
-    #[sea_orm(column_name = "SO2", column_type = "Double")]
-    pub so2: f64,
-    #[sea_orm(column_name = "PM2_5", column_type = "Double")]
-    pub pm2_5: f64,
-    #[sea_orm(column_name = "PM10", column_type = "Double")]
-    pub pm10: f64,
-    #[sea_orm(column_name = "NH3", column_type = "Double")]
-    pub nh3: f64,
+    #[sea_orm(column_name = "CO", column_type = "Float")]
+    pub co: f32,
+    #[sea_orm(column_name = "NO", column_type = "Float")]
+    pub no: f32,
+    #[sea_orm(column_name = "NO2", column_type = "Float")]
+    pub no2: f32,
+    #[sea_orm(column_name = "O3", column_type = "Float")]
+    pub o3: f32,
+    #[sea_orm(column_name = "SO2", column_type = "Float")]
+    pub so2: f32,
+    #[sea_orm(column_name = "PM2_5", column_type = "Float")]
+    pub pm2_5: f32,
+    #[sea_orm(column_name = "PM10", column_type = "Float")]
+    pub pm10: f32,
+    #[sea_orm(column_name = "NH3", column_type = "Float")]
+    pub nh3: f32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

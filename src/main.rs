@@ -6,6 +6,7 @@ use serde_derive::Deserialize;
 pub mod weather;
 pub mod schema;
 pub mod dbman;
+pub mod api;
 
 #[macro_use] extern crate rocket;
 #[macro_use] extern crate log;
@@ -232,5 +233,11 @@ async fn rocket() -> _ {
         Err(_) => error!("DBPing did not work."),
     };
     info!("Setting parsing complete. Starting web server now.");
-    rocket::build().configure(figment).manage(db).mount("/", routes![index, db_ping])
+    rocket::build().configure(figment).manage(db).mount("/", routes![index,
+        db_ping,
+        api::api_index,
+        api::weather,
+        api::sensor_status,
+        api::zone_status,
+        api::pollution])
 }

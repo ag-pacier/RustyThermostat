@@ -5,7 +5,6 @@ pub use super::change_source::Entity as ChangeSource;
 pub use super::communication::Entity as Communication;
 pub use super::controllers::Entity as Controllers;
 pub use super::env_capability::Entity as EnvCapability;
-pub use super::home_summary::Entity as HomeSummary;
 pub use super::hva_cactivity::Entity as HvaCactivity;
 pub use super::manual_change_history::Entity as ManualChangeHistory;
 pub use super::pollution_reading::Entity as PollutionReading;
