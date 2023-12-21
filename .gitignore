@@ -25,4 +25,4 @@ Cargo.lock
 config/rusty_thermostat.toml
 
 # ignore log contents
-logs/rusty.log
+logs/
