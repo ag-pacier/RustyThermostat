@@ -205,7 +205,15 @@ impl Default for WebSensorReading {
     }
 }
 
-pub async fn new_reading(sensor: &mut WebSensor) -> Result<(), sea_orm::error::RuntimeErr> {
-    // TODO: Need to figure out how I'm going to manage the DB on this. Can't delay much longer
-    Ok(())
+pub fn new_reading(sensor: &WebSensor) -> Result<sensor_reading_history::ActiveModel, sea_orm::error::RuntimeErr> {
+    let mut reading: WebSensorReading = WebSensorReading::from_web_sensor(sensor);
+    reading.timestamp = Utc::now().naive_utc();
+    let reading_model: sensor_reading_history::ActiveModel = reading.generate_db_model();
+    Ok(reading_model)
+}
+
+pub fn new_sensor(sensor_name: &str, sens_zone: Option<i32>) -> Result<WebSensor, sea_orm::error::RuntimeErr> {
+    let mut new_sens: WebSensor = WebSensor::new_sensor(sensor_name.to_string(), sens_zone);
+    new_sens.time_added = Utc::now().naive_utc();
+    Ok(new_sens)
 }
